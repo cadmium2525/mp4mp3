@@ -34,12 +34,17 @@ iPhone の画面収録やカメラで撮った動画から、**音声だけを�
 - 映像：画面いっぱい/全体表示、拡大・位置調整、ケン・バーンズ、明るさ・コントラスト・彩度
 - 図形：四角・丸・星・ハート・矢印・吹き出しなど 12 種類、出かた・続く動き・移動/拡大/回転のアニメーション
 - エフェクト：ぼかし、手ぶれ、ズーム鼓動、グリッチ、RGBずれ、モノクロ、周辺減光、フィルム粒子、シネマ帯、フラッシュ、紙吹雪、雪、キラキラ、ハート
+- ワイプ（PiP）：動画・写真を重ねる。丸・角丸の切り取り、ふち、影、音量
+- 切り抜き：AI による人物の切り抜き、タップした物の切り抜き、グリーンバック（すべて端末内）
+- キーフレーム：位置・大きさ・回転・不透明度・3D 角度を時間に沿って自由に動かす
+- 3D：テキスト・図形・ワイプの遠近つき 3D 回転、3D フリップ・キューブのトランジション、立体文字
+- 文字の装飾：グラデーション（ゴールド・レインボーなど）、二重ふち、光彩（ネオン）
 - 書き出し：MP4（iPhone では H.264 + AAC）、720p〜4K、共有シートから写真アプリへ保存
 - プロジェクトと素材は端末内（IndexedDB）に自動保存、元に戻す/やり直し
 - 編集内容は JSON でやり取りでき、Claude などの AI に編集を頼める（形式は [editor/PROJECT_FORMAT.md](editor/PROJECT_FORMAT.md)）。無音区間の自動検出と、素材の「コマ一覧」画像の書き出しで、AI に映像の中身も伝えられる
 - `node editor/tools/render.mjs project.json 素材フォルダ out.mp4` で PC からも同じエンジンで書き出し可能
 
-動画の読み書きには [Mediabunny](https://mediabunny.dev/)（MPL-2.0, `editor/lib/LICENSE.mediabunny`）を使っています。
+動画の読み書きには [Mediabunny](https://mediabunny.dev/)（MPL-2.0, `editor/lib/LICENSE.mediabunny`）、切り抜きには [MediaPipe](https://github.com/google-ai-edge/mediapipe)（Apache-2.0, `editor/lib/mediapipe/LICENSE.txt`）を使っています。
 書き出しは WebCodecs を使うため iOS 16.4 以降の Safari が必要です（音声付きの書き出しは iOS 26 以降）。
 
 ## 公開方法（GitHub Pages・0円）

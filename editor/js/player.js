@@ -2,7 +2,7 @@
  * プレビュー再生。映像はミュートした <video> 要素、音声は Web Audio で鳴らす。
  * 描画は書き出しと同じ drawFrame を使う。
  */
-import { layoutClips, projectDuration, activeClipsAt, mediaTime } from './engine/project.js';
+import { layoutClips, projectDuration, activeClipsAt, mediaTime, overlayEnd } from './engine/project.js';
 import { drawFrame } from './engine/render.js';
 import { scheduleAudio } from './engine/audio.js';
 
@@ -32,6 +32,8 @@ export class Player {
     this.holder.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none;overflow:hidden';
     document.body.append(this.holder);
     this.audioBufs = new Map();
+    // 切り抜きの AI モデルを読み込み終えたら描き直す
+    window.addEventListener('cutoutready', () => this.requestDraw());
   }
 
   setProject(project) {
@@ -41,7 +43,7 @@ export class Player {
     this.#sizeCanvas();
     if (this.t > this.duration) this.t = this.duration;
     // 音声の準備（バックグラウンドでデコード）
-    const ids = new Set([...project.clips.map((c) => c.media), ...project.audios.map((a) => a.media)]);
+    const ids = new Set([...project.clips.map((c) => c.media), ...project.audios.map((a) => a.media), ...(project.overlays || []).map((o) => o.media)]);
     for (const id of ids) {
       if (this.audioBufs.has(id)) continue;
       this.audioBufs.set(id, null);
@@ -122,7 +124,11 @@ export class Player {
   #assignSlots(t) {
     const count = new Map();
     const slots = new Map();
-    const items = activeClipsAt(this.layout, t);
+    // メインのクリップと重ねた映像を、同じ形 {L: {clip}, mt} にそろえる
+    const items = activeClipsAt(this.layout, t).map((it) => ({ L: it.L, mt: mediaTime(it.L, t) }));
+    for (const o of this.project.overlays || []) {
+      if (t >= o.start && t < overlayEnd(o)) items.push({ L: { clip: o, overlay: true }, mt: Math.min(o.out, o.in + (t - o.start) * (o.speed || 1)) });
+    }
     for (const it of items) {
       const id = it.L.clip.media;
       const n = count.get(id) || 0;
@@ -137,7 +143,7 @@ export class Player {
     if (!this.project) return;
     this.#assignSlots(Math.min(this.t, Math.max(0, this.duration - 1e-3)));
     const p = { ...this.project, width: this.canvas.width, height: this.canvas.height };
-    drawFrame(this.ctx, p, this.layout, Math.min(this.t, Math.max(0, this.duration - 1e-3)), (L, mt) => this.#source(L, mt), { hideTextId: this.hideTextId });
+    drawFrame(this.ctx, p, this.layout, Math.min(this.t, Math.max(0, this.duration - 1e-3)), (L, mt) => this.#source(L, mt), { hideTextId: this.hideTextId, preview: true, playing: this.playing });
     if (this.overlay) { this.ctx.save(); this.overlay(this.ctx, this.scale); this.ctx.restore(); }
   }
 
@@ -169,7 +175,7 @@ export class Player {
     // 再生開始時に使う動画要素をユーザー操作の中で一度動かしておく
     for (const it of this.#assignSlots(this.t)) {
       const v = this.#video(it.L.clip.media, this.slots.get(it.L.clip.id));
-      if (v) { v.currentTime = mediaTime(it.L, this.t); v.play().catch(() => {}); }
+      if (v) { v.currentTime = it.mt; v.play().catch(() => {}); }
     }
     const loop = () => {
       if (!this.playing) return;
@@ -215,7 +221,7 @@ export class Player {
       const v = this.#video(L.clip.media, this.slots.get(L.clip.id));
       if (!v) continue;
       used.add(v);
-      const target = mediaTime(L, this.t);
+      const target = it.mt;
       const rate = L.clip.speed || 1;
       if (v.playbackRate !== rate) v.playbackRate = rate;
       if (v.paused) {

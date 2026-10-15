@@ -86,12 +86,13 @@
         <div class="tl-content">
           <div class="tl-ruler"></div>
           <div class="tl-row tl-video"></div>
+          <div class="tl-row tl-ov"></div>
           <div class="tl-row tl-text"></div>
           <div class="tl-row tl-fx"></div>
           <div class="tl-row tl-audio"></div>
         </div>
       </div>
-      <div class="tl-labels" aria-hidden="true"><span>映像</span><span>文字</span><span>効果</span><span>音</span></div>
+      <div class="tl-labels" aria-hidden="true"><span>映像</span><span>重ね</span><span>文字</span><span>効果</span><span>音</span></div>
       <div class="tl-playhead"></div>
     </div>
 
@@ -110,6 +111,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <input type="file" id="fileMedia" accept="video/*,image/*" multiple hidden>
+  <input type="file" id="fileOverlay" accept="video/*,image/*" hidden>
   <input type="file" id="fileAudio" accept="audio/*,video/*,.mp3,.m4a,.wav,.aac" hidden>
   <input type="file" id="fileJson" accept="application/json,.json" hidden>
   <input type="file" id="fileRelink" multiple hidden>

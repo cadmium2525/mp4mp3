@@ -1,7 +1,7 @@
 /*
  * タイムライン。中央の再生ヘッドは固定で、下のトラックを横スクロールして位置を合わせる（スマホ向け）。
  */
-import { layoutClips, TRANSITIONS } from './engine/project.js';
+import { layoutClips, TRANSITIONS, overlayEnd } from './engine/project.js';
 import { SHAPES, EFFECTS } from './engine/fx.js';
 
 const el = (tag, cls, attrs = {}) => {
@@ -30,7 +30,17 @@ function assignLanes(items) {
   return { lane, count: Math.max(1, ends.length) };
 }
 
-const TR_ICON = { none: '＋', fade: '◐', black: '■', white: '□', slide: '⇢', wipe: '▥', zoom: '⤢' };
+const TR_ICON = { none: '＋', fade: '◐', black: '■', white: '□', slide: '⇢', wipe: '▥', zoom: '⤢', flip: '⟲', cube: '◧' };
+
+/** ブロックにキーフレームの印（◆）を付ける */
+function addKeyMarks(b, item, len, pps) {
+  for (const k of item.keys || []) {
+    if (!(k.t >= 0) || k.t > len + 1e-6) continue;
+    const d = el('i', 'kf');
+    d.style.left = `${k.t * pps}px`;
+    b.append(d);
+  }
+}
 
 export class Timeline {
   constructor(root, app) {
@@ -43,6 +53,7 @@ export class Timeline {
     this.rows = {
       clip: root.querySelector('.tl-video'),
       text: root.querySelector('.tl-text'),
+      ov: root.querySelector('.tl-ov'),
       fx: root.querySelector('.tl-fx'),
       audio: root.querySelector('.tl-audio'),
     };
@@ -162,7 +173,24 @@ export class Timeline {
       const lab = el('span', 'blabel');
       lab.textContent = o.label;
       b.append(lab);
+      addKeyMarks(b, o.item, o.item.end - o.item.start, this.pps);
       trow.append(b);
+    }
+
+    // 重ねた映像（ワイプ）トラック
+    const vrow2 = this.rows.ov;
+    vrow2.textContent = '';
+    const ovs = p.overlays || [];
+    const vl = assignLanes(ovs.map((o) => ({ id: o.id, start: o.start, end: overlayEnd(o) })));
+    for (const o of ovs) {
+      const len = overlayEnd(o) - o.start;
+      const b = this.#block('overlay', o.id, o.start, len, vl.lane.get(o.id), vl.count);
+      const lab = el('span', 'blabel');
+      const m = p.media[o.media];
+      lab.textContent = `${o.cutout?.mode ? '✂ ' : '▣ '}${m?.name || ''}`;
+      b.append(lab);
+      addKeyMarks(b, o, len, this.pps);
+      vrow2.append(b);
     }
 
     // エフェクトトラック

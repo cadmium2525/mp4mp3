@@ -21,6 +21,8 @@ export const TRANSITIONS = {
   slide: { label: 'スライド', overlap: true },
   wipe: { label: 'ワイプ', overlap: true },
   zoom: { label: 'ズーム', overlap: true },
+  flip: { label: '3Dフリップ', overlap: true },
+  cube: { label: '3Dキューブ', overlap: true },
 };
 
 export const uid = (p = 'x') => p + Math.random().toString(36).slice(2, 9);
@@ -40,6 +42,7 @@ export function newProject(preset = 'shorts') {
     clips: [],
     texts: [],
     audios: [],
+    overlays: [],
     shapes: [],
     effects: [],
     updatedAt: Date.now(),
@@ -73,6 +76,41 @@ export function newShape(start, kind = 'round', opts = {}) {
   };
 }
 
+/** 画面に重ねる動画・写真（ワイプ / PiP） */
+export function newOverlay(media, start = 0, opts = {}) {
+  const isImg = media.kind === 'image';
+  return {
+    id: uid('o'),
+    media: media.id,
+    start,
+    in: 0,
+    out: isImg ? 3 : media.duration,
+    speed: 1,
+    volume: 1,
+    x: 0.72,
+    y: 0.28,
+    w: 0.42,
+    rotation: 0,
+    opacity: 1,
+    scale: 1,
+    rx: 0,
+    ry: 0,
+    mask: 'round',
+    radius: 0.08,
+    border: 0.006,
+    borderColor: '#ffffff',
+    shadow: true,
+    anim: 'pop',
+    loop: 'none',
+    keys: null,
+    ease: 'ease',
+    cutout: null,
+    ...opts,
+  };
+}
+
+export const overlayEnd = (o) => o.start + Math.max(0.05, (o.out - o.in) / (o.speed || 1));
+
 export function newEffect(start, type = 'flash', opts = {}) {
   return { id: uid('e'), type, start, end: start + (type === 'flash' ? 0.6 : 2), intensity: 0.6, ...opts };
 }
@@ -105,6 +143,11 @@ export const TEXT_STYLES = {
   pop: { label: 'ポップ', font: 'rounded', color: '#ffffff', stroke: '#ff4f8b', strokeWidth: 0.22, bg: null, shadow: false, size: 0.085 },
   elegant: { label: '明朝', font: 'mincho', color: '#ffffff', stroke: null, strokeWidth: 0, bg: null, shadow: true, size: 0.07 },
   label: { label: '帯ラベル', font: 'gothic', color: '#111111', stroke: null, strokeWidth: 0, bg: '#ffe14d', shadow: false, size: 0.055 },
+  gold: { label: 'ゴールド', font: 'gothic', color: 'gradient:gold', stroke: '#5a3a00', strokeWidth: 0.08, strokes: [{ color: '#ffffff', width: 0.2 }], bg: null, shadow: true, extrude: { depth: 0.1, color: '#6b4500', angle: 120 }, size: 0.1 },
+  neon: { label: 'ネオン', font: 'rounded', color: '#ffffff', stroke: '#ff2bd6', strokeWidth: 0.06, bg: null, shadow: false, glow: { color: '#ff2bd6', size: 0.5 }, size: 0.085 },
+  rainbow: { label: 'レインボー', font: 'rounded', color: 'gradient:rainbow', stroke: '#ffffff', strokeWidth: 0.16, bg: null, shadow: true, size: 0.09 },
+  pop3d: { label: '立体', font: 'gothic', color: '#ffe14d', stroke: '#111111', strokeWidth: 0.08, bg: null, shadow: false, extrude: { depth: 0.14, color: '#e8590c', angle: 135 }, size: 0.1 },
+  double: { label: '二重ふち', font: 'gothic', color: '#ff4f8b', stroke: '#ffffff', strokeWidth: 0.12, strokes: [{ color: '#111111', width: 0.24 }], bg: null, shadow: false, size: 0.085 },
 };
 
 export function newText(start, opts = {}) {
@@ -176,6 +219,7 @@ export function projectDuration(project, layout = layoutClips(project)) {
   let d = layout.length ? layout[layout.length - 1].end : 0;
   for (const t of project.texts) d = Math.max(d, t.end);
   for (const s of project.shapes || []) d = Math.max(d, s.end);
+  for (const o of project.overlays || []) d = Math.max(d, overlayEnd(o));
   for (const e of project.effects || []) d = Math.max(d, e.end);
   if (!d) {
     for (const a of project.audios) d = Math.max(d, a.start + (a.out - a.in));
@@ -202,13 +246,21 @@ export function activeClipsAt(layout, t) {
       if (tr.type === 'slide') item.offsetX = 1 - easeInOut(p);
       if (tr.type === 'wipe') item.clipRect = easeInOut(p);
       if (tr.type === 'zoom') { item.alpha = p; item.scale = 1.3 - 0.3 * easeOut(p); }
+      // 3D：前半は前のクリップが回って消え、後半にこのクリップが回って出てくる
+      if (tr.type === 'flip') { if (p < 0.5) item.hidden = true; else item.ry = -90 * (1 - easeOut((p - 0.5) * 2)); }
+      if (tr.type === 'cube') { item.ry = -90 * (1 - easeInOut(p)); item.cube = true; }
     }
     // 次のクリップがズームで入ってくるとき、前のクリップも少し拡大
     if (next && next.tIn.type === 'zoom' && t >= next.start) {
       const p = (t - next.start) / next.tIn.d;
       item.scale = 1 + 0.15 * easeIn(Math.min(1, p));
     }
-    res.push(item);
+    if (next && next.tIn.d > 0 && t >= next.start && (next.tIn.type === 'flip' || next.tIn.type === 'cube')) {
+      const p = Math.min(1, (t - next.start) / next.tIn.d);
+      if (next.tIn.type === 'flip') { if (p >= 0.5) item.hidden = true; else item.ry = 90 * easeIn(p * 2); }
+      else { item.ry = 90 * easeInOut(p); item.cube = true; }
+    }
+    if (!item.hidden) res.push(item);
   }
   return res;
 }
@@ -253,6 +305,7 @@ export function usedMediaIds(project) {
   const s = new Set();
   for (const c of project.clips) s.add(c.media);
   for (const a of project.audios) s.add(a.media);
+  for (const o of project.overlays || []) s.add(o.media);
   return s;
 }
 
@@ -279,5 +332,9 @@ export function normalizeProject(p) {
   for (const t of proj.texts) delete t.label;
   proj.shapes = (p.shapes || []).map((x) => newShape(x.start ?? 0, x.kind || 'round', defined(x)));
   proj.effects = (p.effects || []).map((x) => newEffect(x.start ?? 0, x.type || 'flash', defined(x)));
+  proj.overlays = (p.overlays || []).map((o) => {
+    const m = proj.media[o.media] || { id: o.media, kind: 'video', duration: o.out ?? 3 };
+    return newOverlay({ id: o.media, ...m }, o.start ?? 0, defined(o));
+  });
   return proj;
 }

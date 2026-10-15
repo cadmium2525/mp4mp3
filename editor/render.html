@@ -12,9 +12,10 @@
 <canvas id="still"></canvas>
 <script type="module">
 import { MediaLibrary } from './js/engine/media.js';
-import { normalizeProject, layoutClips } from './js/engine/project.js';
+import { normalizeProject, layoutClips, activeClipsAt, mediaTime, overlayEnd } from './js/engine/project.js';
 import { exportVideo } from './js/engine/exporter.js';
 import { drawFrame, loadFonts } from './js/engine/render.js';
+import { loadCutout } from './js/engine/cutout.js';
 
 async function load(projectJson) {
   const project = { ...projectJson, media: { ...projectJson.media } };
@@ -27,7 +28,11 @@ async function load(projectJson) {
     // 手書き JSON では kind/duration 等を省略できる（実ファイルから補う）
     project.media[id] = { ...meta, ...m, duration: meta.duration, width: meta.width, height: meta.height, hasAudio: meta.hasAudio, kind: meta.kind };
   }
-  return { project: normalizeProject(project), lib };
+  const p = normalizeProject(project);
+  await loadFonts(p);
+  const modes = new Set([...p.clips, ...p.overlays].map((x) => x.cutout?.mode).filter(Boolean));
+  for (const m of modes) await loadCutout(m === 'object' ? 'object' : m === 'chroma' ? 'chroma' : 'person');
+  return { project: p, lib };
 }
 
 function save(blob, name) {
@@ -36,6 +41,21 @@ function save(blob, name) {
   a.download = name;
   document.body.append(a);
   a.click();
+}
+
+/** 時刻 t の1フレームを canvas に描く（W×H は project の大きさ） */
+async function frameAt(project, lib, layout, t, ctx) {
+  const srcs = new Map();
+  const get = async (key, media, mt) => {
+    const rd = lib.frameReader(media, [mt], project.width, project.height);
+    srcs.set(key, await rd.next());
+    rd.close();
+  };
+  for (const it of activeClipsAt(layout, t)) await get(it.L.clip.id, it.L.clip.media, mediaTime(it.L, t));
+  for (const o of project.overlays) {
+    if (t >= o.start && t < overlayEnd(o)) await get(o.id, o.media, Math.min(o.out, o.in + (t - o.start) * (o.speed || 1)));
+  }
+  drawFrame(ctx, project, layout, t, (L) => srcs.get(L.clip.id));
 }
 
 window.renderProject = async (projectJson, opts = {}) => {
@@ -48,19 +68,40 @@ window.renderProject = async (projectJson, opts = {}) => {
 /** 指定時刻の静止画（PNG）を書き出す。構図の確認用 */
 window.renderStill = async (projectJson, t) => {
   const { project, lib } = await load(projectJson);
-  await loadFonts(project);
   const c = document.getElementById('still');
   c.width = project.width; c.height = project.height;
+  await frameAt(project, lib, layoutClips(project), t, c.getContext('2d'));
+  save(await new Promise((r) => c.toBlob(r, 'image/png')), 'still.png');
+  return true;
+};
+
+/** 全体を n 枚のコマに分けた一覧画像（動きの確認用） */
+window.renderSheet = async (projectJson, n = 12, cols = 4) => {
+  const { project, lib } = await load(projectJson);
   const layout = layoutClips(project);
-  const srcs = new Map();
-  const { activeClipsAt, mediaTime } = await import('./js/engine/project.js');
-  for (const it of activeClipsAt(layout, t)) {
-    const rd = lib.frameReader(it.L.clip.media, [mediaTime(it.L, t)], project.width, project.height);
-    srcs.set(it.L.clip.id, await rd.next());
+  const { projectDuration } = await import('./js/engine/project.js');
+  const dur = projectDuration(project, layout);
+  const frame = document.createElement('canvas');
+  frame.width = project.width; frame.height = project.height;
+  const fctx = frame.getContext('2d');
+  const cw = 320, ch = Math.round((cw * project.height) / project.width);
+  const rows = Math.ceil(n / cols);
+  const sheet = document.getElementById('still');
+  sheet.width = cols * cw; sheet.height = rows * ch;
+  const sctx = sheet.getContext('2d');
+  sctx.fillStyle = '#111'; sctx.fillRect(0, 0, sheet.width, sheet.height);
+  for (let i = 0; i < n; i++) {
+    const t = Math.min(dur - 0.001, (dur * (i + 0.5)) / n);
+    await frameAt(project, lib, layout, t, fctx);
+    const x = (i % cols) * cw, y = Math.floor(i / cols) * ch;
+    sctx.drawImage(frame, x, y, cw, ch);
+    sctx.strokeStyle = '#111'; sctx.strokeRect(x, y, cw, ch);
+    sctx.font = 'bold 18px sans-serif';
+    const label = `${t.toFixed(2)}s`;
+    sctx.fillStyle = 'rgba(0,0,0,0.7)'; sctx.fillRect(x + 4, y + 4, sctx.measureText(label).width + 10, 24);
+    sctx.fillStyle = '#ffcc33'; sctx.fillText(label, x + 9, y + 22);
   }
-  drawFrame(c.getContext('2d'), project, layout, t, (L) => srcs.get(L.clip.id));
-  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
-  save(blob, 'still.png');
+  save(await new Promise((r) => sheet.toBlob(r, 'image/png')), 'sheet.png');
   return true;
 };
 window.ready = true;

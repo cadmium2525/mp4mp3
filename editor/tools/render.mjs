@@ -2,7 +2,11 @@
 /*
  * つなぐ のプロジェクト JSON を、ブラウザと同じエンジンで書き出すコマンド。
  *
- *   node editor/tools/render.mjs project.json 素材フォルダ out.mp4 [--still 秒] [--short 1080] [--quality high]
+ *   node editor/tools/render.mjs project.json 素材フォルダ out.mp4 [--still 秒 | --sheet 枚数] [--short 1080] [--quality high] [--force]
+ *
+ *   --still 3     3秒地点の静止画（PNG）
+ *   --sheet 12    全体を12コマに分けた一覧画像（PNG）
+ *   --force       JSON にエラーがあっても書き出す
  *
  * ヘッドレス Chromium（Playwright）で editor/render.html を開いて書き出す。
  * Chromium が H.264/AAC に対応していない場合は VP9/Opus で書き出され、ffmpeg があれば H.264/AAC に変換する。
@@ -24,6 +28,9 @@ try { playwright = require('playwright'); } catch {
 const args = process.argv.slice(2);
 const flag = (name, def) => { const i = args.indexOf(name); if (i < 0) return def; const v = args[i + 1]; args.splice(i, 2); return v; };
 const still = flag('--still', null);
+const sheet = flag('--sheet', null);
+const force = args.includes('--force');
+if (force) args.splice(args.indexOf('--force'), 1);
 const shortSide = Number(flag('--short', 1080));
 const quality = flag('--quality', 'high');
 const [projPath, mediaDir, outPath = 'out.mp4'] = args;
@@ -33,7 +40,7 @@ if (!projPath || !mediaDir) {
 }
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const server = createServer((req, res) => {
   const p = join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
   if (!p.startsWith(root) || !existsSync(p)) { res.writeHead(404); return res.end(); }
@@ -44,12 +51,20 @@ await new Promise((r) => server.listen(0, r));
 const port = server.address().port;
 
 const project = JSON.parse(readFileSync(projPath, 'utf8'));
+const { validateProject } = await import('../js/engine/validate.js');
+const check = validateProject(project);
+for (const e of check.errors) console.error(`✗ ${e}`);
+for (const w of check.warnings) console.error(`△ ${w}`);
+if (check.errors.length && !force) {
+  console.error(`JSON にエラーが ${check.errors.length} 件あります（--force で無視して書き出し）`);
+  process.exit(1);
+}
 const files = readdirSync(mediaDir).map((f) => join(mediaDir, f));
 
 const browser = await playwright.chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 try {
   const page = await browser.newPage({ acceptDownloads: true });
-  page.on('console', (m) => { if (m.text().startsWith('progress')) process.stderr.write(`\r${m.text().slice(9)}        `); else if (m.type() === 'error') console.error(m.text()); });
+  page.on('console', (m) => { if (m.text().startsWith('progress')) process.stderr.write(`\r${m.text().slice(9)}        `); else if (m.type() === 'error' && !/WebGL|GPU stall|swiftshader/i.test(m.text())) console.error(m.text()); });
   page.on('pageerror', (e) => console.error('pageerror', e.message));
   await page.goto(`http://localhost:${port}/editor/render.html`);
   await page.waitForFunction(() => window.ready);
@@ -58,12 +73,14 @@ try {
     page.waitForEvent('download', { timeout: 0 }),
     still != null
       ? page.evaluate(([p, t]) => window.renderStill(p, t), [project, Number(still)])
-      : page.evaluate(([p, o]) => window.renderProject(p, o), [project, { shortSide, quality }]),
+      : sheet != null
+        ? page.evaluate(([p, n]) => window.renderSheet(p, n, n > 12 ? 5 : 4), [project, Number(sheet) || 12])
+        : page.evaluate(([p, o]) => window.renderProject(p, o), [project, { shortSide, quality }]),
   ]);
   process.stderr.write('\n');
-  if (still != null) {
+  if (still != null || sheet != null) {
     await download.saveAs(outPath);
-    console.log(`静止画: ${outPath}`);
+    console.log(`${still != null ? '静止画' : 'コマ一覧'}: ${outPath}`);
   } else {
     const tmp = outPath + '.tmp.mp4';
     await download.saveAs(tmp);

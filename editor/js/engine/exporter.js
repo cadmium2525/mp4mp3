@@ -3,7 +3,8 @@
  * iPhone（Safari）では H.264 + AAC、対応していない環境では VP9/AV1 + Opus になる。
  */
 import * as MB from '../../lib/mediabunny.min.mjs';
-import { layoutClips, projectDuration, activeClipsAt, mediaTime } from './project.js';
+import { layoutClips, projectDuration, activeClipsAt, mediaTime, overlayEnd } from './project.js';
+import { loadCutout } from './cutout.js';
 import { drawFrame, loadFonts } from './render.js';
 import { mixdown } from './audio.js';
 
@@ -46,6 +47,12 @@ export async function exportVideo(project, lib, opts = {}) {
 
   await loadFonts(proj);
   onProgress(0, '準備中…');
+  // 切り抜き用の AI モデルを先に読み込む
+  const modes = new Set([...proj.clips, ...(proj.overlays || [])].map((x) => x.cutout?.mode).filter(Boolean));
+  for (const m of modes) {
+    onProgress(0, '切り抜きの準備中…');
+    await loadCutout(m === 'object' ? 'object' : m === 'chroma' ? 'chroma' : 'person');
+  }
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -75,6 +82,7 @@ export async function exportVideo(project, lib, opts = {}) {
       onProgress(0, '音声を準備中…');
       const ids = new Set();
       for (const L of layout) if (L.clip.volume > 0) ids.add(L.clip.media);
+      for (const o of proj.overlays || []) if (o.volume > 0) ids.add(o.media);
       for (const a of proj.audios) if (a.volume > 0) ids.add(a.media);
       const bufs = new Map();
       for (const id of ids) {
@@ -97,10 +105,17 @@ export async function exportVideo(project, lib, opts = {}) {
         if (!stamps.has(id)) stamps.set(id, []);
         stamps.get(id).push(mediaTime(it.L, t));
       }
+      for (const o of activeOverlays(proj, t)) {
+        if (!stamps.has(o.id)) stamps.set(o.id, []);
+        stamps.get(o.id).push(overlayTime(o, t));
+      }
     }
     const readers = new Map();
     for (const L of layout) {
       if (stamps.has(L.clip.id)) readers.set(L.clip.id, lib.frameReader(L.clip.media, stamps.get(L.clip.id), width, height));
+    }
+    for (const o of proj.overlays || []) {
+      if (stamps.has(o.id)) readers.set(o.id, lib.frameReader(o.media, stamps.get(o.id), width, height));
     }
 
     for (let k = 0; k < frames; k++) {
@@ -110,6 +125,7 @@ export async function exportVideo(project, lib, opts = {}) {
       for (const it of activeClipsAt(layout, t)) {
         srcs.set(it.L.clip.id, await readers.get(it.L.clip.id).next());
       }
+      for (const o of activeOverlays(proj, t)) srcs.set(o.id, await readers.get(o.id).next());
       drawFrame(ctx, proj, layout, t, (L) => srcs.get(L.clip.id));
       await videoSource.add(t, 1 / fps);
       if (k % 5 === 0) onProgress(k / frames, `書き出し中… ${Math.round((k / frames) * 100)}%`);
@@ -126,3 +142,6 @@ export async function exportVideo(project, lib, opts = {}) {
   const blob = new Blob([output.target.buffer], { type: 'video/mp4' });
   return { blob, codec: codecs.video, audioCodec: codecs.audio, width, height, duration: total };
 }
+
+const activeOverlays = (p, t) => (p.overlays || []).filter((o) => t >= o.start && t < overlayEnd(o));
+const overlayTime = (o, t) => Math.min(o.out, o.in + (t - o.start) * (o.speed || 1));

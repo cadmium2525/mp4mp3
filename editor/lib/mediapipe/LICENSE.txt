@@ -1,0 +1,5 @@
+MediaPipe Tasks Vision (@mediapipe/tasks-vision 1.0.1) と、そのモデル
+（selfie_segmenter.tflite / magic_touch.tflite）は Google LLC により
+Apache License 2.0 で提供されています。
+https://github.com/google-ai-edge/mediapipe
+https://www.apache.org/licenses/LICENSE-2.0

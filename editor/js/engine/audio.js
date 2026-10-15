@@ -1,7 +1,7 @@
 /*
  * 音声のミックス。プレビュー（AudioContext）と書き出し（OfflineAudioContext）で同じスケジュールを使う。
  */
-import { projectDuration, TRANSITIONS } from './project.js';
+import { projectDuration, TRANSITIONS, overlayEnd } from './project.js';
 
 /** [時刻, 値] の折れ線で表した音量カーブ */
 function envelope(points) {
@@ -97,6 +97,21 @@ export function scheduleAudio(ctx, project, layout, getBuffer, t0, ctxStart, des
       points: withProjectFade(fadeEnv(L.start, end, fi, fo, vol), project, total),
     });
   });
+
+  // 重ねた映像（ワイプ）の音
+  for (const o of project.overlays || []) {
+    if (!(o.volume > 0)) continue;
+    const buf = getBuffer(o.media);
+    if (!buf) continue;
+    const end = Math.min(overlayEnd(o), total);
+    play(buf, {
+      start: o.start,
+      end,
+      offset: o.in,
+      rate: o.speed || 1,
+      points: withProjectFade(fadeEnv(o.start, end, 0.02, 0.02, o.volume), project, total),
+    });
+  }
 
   // BGM・効果音
   for (const a of project.audios) {

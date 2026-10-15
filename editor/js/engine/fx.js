@@ -13,17 +13,87 @@ export const EASINGS = {
   back: (p) => { const c = 1.70158; return 1 + (c + 1) * (p - 1) ** 3 + c * (p - 1) ** 2; },
 };
 
-/** item.to に書かれた数値を、表示時間の始め→終わりで補間した値にする */
+/** キーフレームで動かせる項目 */
+export const ANIM_PROPS = ['x', 'y', 'w', 'h', 'size', 'rotation', 'opacity', 'scale', 'rx', 'ry'];
+
+/** 表示の終わりの時刻（オーバーレイは素材の長さから決まる） */
+export const itemEnd = (it) => (it.end != null ? it.end : it.start + (it.out - it.in) / (it.speed || 1));
+
+/**
+ * キーフレームを時刻順に並べた「状態の列」にする。
+ * keys: [{ t: 開始からの秒, x?, y?, ..., ease? }]。書いていない項目は前のキーの値を引き継ぐ。
+ * to: { ... } は「最初→最後」の 2 点キーフレームの省略形。
+ */
+export function keyStates(item) {
+  let keys = item.keys;
+  if (!keys || !keys.length) {
+    if (!item.to) return null;
+    keys = [{ t: 0 }, { t: itemEnd(item) - item.start, ...item.to, ease: item.ease }];
+  }
+  keys = [...keys].sort((a, b) => a.t - b.t);
+  if (keys[0].t > 0) keys.unshift({ t: 0 });
+  const states = [];
+  let cur = {};
+  for (const k of ANIM_PROPS) if (typeof item[k] === 'number') cur[k] = item[k];
+  for (const k of keys) {
+    cur = { ...cur };
+    for (const p of ANIM_PROPS) if (typeof k[p] === 'number') cur[p] = k[p];
+    states.push({ t: k.t, ease: k.ease, v: cur });
+  }
+  return states;
+}
+
+/** 時刻 t の位置・大きさ・回転などを、キーフレーム（または to）から補間した値にする */
 export function withMotion(item, t) {
-  if (!item.to) return item;
-  const d = item.end - item.start;
-  const p = d > 0 ? Math.min(1, Math.max(0, (t - item.start) / d)) : 1;
-  const e = (EASINGS[item.ease] || EASINGS.ease)(p);
+  const states = keyStates(item);
+  if (!states) return item;
+  const local = t - item.start;
+  let a = states[0], b = null;
+  for (let i = 0; i < states.length; i++) {
+    if (states[i].t <= local) a = states[i];
+    else { b = states[i]; break; }
+  }
   const out = { ...item };
-  for (const [k, v] of Object.entries(item.to)) {
-    if (typeof v === 'number' && typeof item[k] === 'number') out[k] = item[k] + (v - item[k]) * e;
+  if (!b || b.t <= a.t) { Object.assign(out, a.v); return out; }
+  const p = (local - a.t) / (b.t - a.t);
+  const e = (EASINGS[b.ease || item.ease] || EASINGS.ease)(Math.min(1, Math.max(0, p)));
+  for (const k of Object.keys(b.v)) {
+    const v0 = a.v[k] ?? item[k], v1 = b.v[k];
+    if (typeof v0 === 'number' && typeof v1 === 'number') out[k] = v0 + (v1 - v0) * e;
   }
   return out;
+}
+
+/* ---------- 塗り（単色・グラデーション） ---------- */
+
+export const GRADIENTS = {
+  gold: { colors: ['#fff7cc', '#ffd34d', '#c98a00', '#ffe680'], angle: 90 },
+  silver: { colors: ['#ffffff', '#c9d1d9', '#7d8590', '#e6edf3'], angle: 90 },
+  rainbow: { colors: ['#ff4f4f', '#ffb84f', '#ffe84f', '#5fe08a', '#4fc3ff', '#b07bff'], angle: 0 },
+  sunset: { colors: ['#ffd36e', '#ff7a3d', '#ff3d8b'], angle: 90 },
+  ocean: { colors: ['#8ff3ff', '#2a9dff', '#3d3dff'], angle: 90 },
+  sakura: { colors: ['#ffffff', '#ffc0d9', '#ff6fa8'], angle: 90 },
+  neon: { colors: ['#00fff0', '#ff00e6'], angle: 0 },
+};
+
+/**
+ * 色の指定（"#fff" / { colors: [...], angle } / "gradient:gold"）から塗りを作る。
+ * box は塗る範囲（グラデーションの向きと長さの基準）。
+ */
+export function paint(ctx, spec, box) {
+  if (!spec) return null;
+  if (typeof spec === 'string') {
+    if (!spec.startsWith('gradient:')) return spec;
+    spec = GRADIENTS[spec.slice(9)] || GRADIENTS.gold;
+  }
+  const colors = spec.colors && spec.colors.length ? spec.colors : ['#fff', '#000'];
+  const ang = ((spec.angle ?? 90) * Math.PI) / 180;
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  const dx = Math.cos(ang), dy = Math.sin(ang);
+  const half = (Math.abs(dx) * box.w + Math.abs(dy) * box.h) / 2;
+  const g = ctx.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half);
+  colors.forEach((c, i) => g.addColorStop(colors.length === 1 ? 0 : i / (colors.length - 1), c));
+  return g;
 }
 
 /* ---------- 乱数（時刻と番号から決まる） ---------- */
@@ -151,9 +221,9 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/** 入り・出の動きと、ずっと続く動き（loop） */
-function shapeAnim(s, t) {
-  const local = t - s.start, remain = s.end - t;
+/** 入り・出の動きと、ずっと続く動き（loop）。図形・重ねた映像で共通 */
+export function shapeAnim(s, t) {
+  const local = t - s.start, remain = itemEnd(s) - t;
   const st = { alpha: 1, scale: 1, dy: 0, rot: 0, reveal: 1 };
   const IN = 0.35, OUT = 0.25;
   const p = Math.min(1, Math.max(0, local / IN));
@@ -178,7 +248,7 @@ function shapeAnim(s, t) {
 /** 図形の位置・大きさ（px）。ドラッグの当たり判定にも使う */
 export function shapeBox(W, H, s0, t) {
   const s = withMotion(s0, t);
-  const base = Math.min(W, H);
+  const base = Math.min(W, H) * (s.scale ?? 1);
   const w = Math.max(1, s.w * base), h = Math.max(1, s.h * base);
   return { s, cx: s.x * W, cy: s.y * H, w, h, box: { x: s.x * W - w / 2, y: s.y * H - h / 2, w, h } };
 }
@@ -207,7 +277,7 @@ export function drawShape(ctx, W, H, s0, t) {
     ctx.strokeStyle = s.stroke || s.fill || '#fff';
     ctx.stroke();
   } else {
-    if (s.fill) { ctx.fillStyle = s.fill; ctx.fill(); }
+    if (s.fill) { ctx.fillStyle = paint(ctx, s.fill, { x: -w / 2, y: -h / 2, w, h }); ctx.fill(); }
     ctx.shadowColor = 'transparent';
     if (s.stroke && s.strokeWidth > 0) {
       ctx.lineWidth = lw;

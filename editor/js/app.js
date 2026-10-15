@@ -1,11 +1,13 @@
 import {
-  PRESETS, TRANSITIONS, TEXT_STYLES, newProject, newClip, newText, newAudio, newShape, newEffect, uid,
+  PRESETS, TRANSITIONS, TEXT_STYLES, newProject, newClip, newText, newAudio, newShape, newEffect, newOverlay, overlayEnd, uid,
   layoutClips, mediaTime, normalizeProject, usedMediaIds,
 } from './engine/project.js';
 import { MediaLibrary } from './engine/media.js';
 import { exportVideo, outputSize, supportedCodecs, QUALITIES } from './engine/exporter.js';
-import { drawText, measureText, loadFonts } from './engine/render.js';
-import { SHAPES, EFFECTS, drawShape, shapeBox, withMotion } from './engine/fx.js';
+import { drawText, measureText, loadFonts, overlayBox } from './engine/render.js';
+import { SHAPES, EFFECTS, drawShape, shapeBox, withMotion, keyStates, itemEnd, ANIM_PROPS, GRADIENTS } from './engine/fx.js';
+import { loadCutout, cutoutReady } from './engine/cutout.js';
+import { validateProject } from './engine/validate.js';
 import { Player } from './player.js';
 import { Timeline } from './timeline.js';
 import * as store from './store.js';
@@ -52,6 +54,8 @@ const ICONS = {
   fx: '<path d="M12 3l1.8 4.7L19 9l-4.2 3 1.3 5.2L12 14.5 7.9 17.2 9.2 12 5 9l5.2-1.3z"/>',
   front: '<rect x="4" y="4" width="11" height="11" rx="1.5"/><path d="M9 20h11V9"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/>',
+  pip: '<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1"/>',
+  cut: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 8L20 19M8.5 16L20 5"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24">${ICONS[name]}</svg>`;
 
@@ -312,7 +316,7 @@ class App {
 
   listOf(type) {
     const p = this.project;
-    return { clip: p.clips, text: p.texts, audio: p.audios, shape: p.shapes, effect: p.effects }[type];
+    return { clip: p.clips, text: p.texts, audio: p.audios, shape: p.shapes, effect: p.effects, overlay: p.overlays }[type];
   }
 
   findItem(type, id) {
@@ -382,13 +386,7 @@ class App {
       if (t <= tx.start + 0.1 || t >= tx.end - 0.1) return toast('途中に再生ヘッドを合わせてください');
       return this.change(() => {
         const b = { ...JSON.parse(JSON.stringify(tx)), id: uid(sel.type[0]), start: t };
-        if (tx.to) {
-          // 動きは分割点の状態で前半を終え、後半はそこから続ける
-          const mid = withMotion(tx, t);
-          const firstTo = {};
-          for (const k of Object.keys(tx.to)) { firstTo[k] = mid[k]; b[k] = mid[k]; }
-          tx.to = firstTo;
-        }
+        splitMotion(tx, b, t);
         if ('anim' in tx) {
           // 前半は消えずに、後半は出現アニメなしでつなぐ
           b.animOut = tx.animOut ?? tx.anim !== 'none';
@@ -397,6 +395,20 @@ class App {
         }
         tx.end = t;
         list.splice(list.indexOf(tx) + 1, 0, b);
+      });
+    }
+    if (sel?.type === 'overlay') {
+      const o = this.findItem('overlay', sel.id);
+      if (t <= o.start + 0.1 || t >= overlayEnd(o) - 0.1) return toast('途中に再生ヘッドを合わせてください');
+      return this.change(() => {
+        const mid = o.in + (t - o.start) * (o.speed || 1);
+        const b = { ...JSON.parse(JSON.stringify(o)), id: uid('o'), start: t, in: mid };
+        splitMotion(o, b, t);
+        b.animOut = o.animOut ?? o.anim !== 'none';
+        b.anim = 'none';
+        o.animOut = false;
+        o.out = mid;
+        p.overlays.splice(p.overlays.indexOf(o) + 1, 0, b);
       });
     }
     if (sel?.type === 'audio') {
@@ -457,6 +469,7 @@ class App {
         this.listOf(sel.type).push(copy);
       }
       if (sel.type === 'audio') { copy.start = item.start + (item.out - item.in); p.audios.push(copy); }
+      if (sel.type === 'overlay') { copy.x = Math.min(0.9, item.x + 0.05); copy.y = Math.min(0.9, item.y + 0.05); p.overlays.push(copy); }
     });
     this.select({ type: sel.type, id: copy.id });
   }
@@ -496,6 +509,24 @@ class App {
         item.start = Math.max(0, snap(orig.start + dt));
         item.end = item.start + d;
       }
+    } else if (type === 'overlay') {
+      const media = p.media[item.media];
+      const sp = item.speed || 1;
+      const isImg = media?.kind === 'image';
+      const snap = (v) => (Math.abs(v - this.player.t) * this.timeline.pps < 10 ? this.player.t : v);
+      if (mode === 'left') {
+        if (isImg) {
+          const ns = Math.min(orig.start + (orig.out - orig.in) - 0.2, Math.max(0, snap(orig.start + dt)));
+          item.start = ns;
+          item.out = orig.out - (ns - orig.start);
+        } else {
+          const ni = Math.min(orig.out - 0.2, Math.max(0, orig.in + dt * sp));
+          item.in = ni;
+          item.start = Math.max(0, orig.start + (ni - orig.in) / sp);
+        }
+      }
+      if (mode === 'right') item.out = Math.max(item.in + 0.2, Math.min(isImg ? 3600 : media.duration, orig.out + dt * sp));
+      if (mode === 'move') item.start = Math.max(0, snap(orig.start + dt));
     } else if (type === 'audio') {
       const media = p.media[item.media];
       if (mode === 'left') {
@@ -525,6 +556,7 @@ class App {
     if (!sel) {
       tool('media', '素材を追加', () => this.addMediaDialog());
       tool('text', 'テキスト', () => this.addText());
+      tool('pip', 'ワイプ', () => $('#fileOverlay').click());
       tool('shape', '図形', () => this.addShapeDialog());
       tool('fx', 'エフェクト', () => this.addEffectDialog());
       tool('music', '音楽・音', () => $('#fileAudio').click());
@@ -541,6 +573,7 @@ class App {
       if (!isImg) tool('volume', '音量', () => this.openInspector('volume'));
       tool('frame', '表示', () => this.openInspector('frame'));
       tool('color', '色調整', () => this.openInspector('color'));
+      tool('cut', '切り抜き', () => this.openInspector('cutout'));
       tool('trans', '切替効果', () => this.openTransition(sel.id));
       tool('left', '前へ', () => this.moveClip(-1));
       tool('right', '後ろへ', () => this.moveClip(1));
@@ -550,6 +583,13 @@ class App {
       tool('edit', '編集', () => this.openInspector());
       tool('split', '分割', () => this.splitAtPlayhead());
       tool('dup', '複製', () => this.duplicateSelected());
+      tool('del', '削除', () => this.deleteSelected(), 'danger');
+    } else if (sel.type === 'overlay') {
+      tool('edit', '編集', () => this.openInspector());
+      tool('cut', '切り抜き', () => this.openInspector('cutout'));
+      tool('split', '分割', () => this.splitAtPlayhead());
+      tool('dup', '複製', () => this.duplicateSelected());
+      tool('front', '最前面へ', () => this.bringToFront());
       tool('del', '削除', () => this.deleteSelected(), 'danger');
     } else if (sel.type === 'shape' || sel.type === 'effect') {
       tool('edit', '編集', () => this.openInspector());
@@ -638,12 +678,13 @@ class App {
     for (const c of all) {
       const b = h('button', { type: 'button', class: 'sw' + (c === null ? ' none' : ''), 'aria-label': c || 'なし' });
       b.dataset.v = String(c);
-      if (c) b.style.background = c;
+      if (c && c.startsWith('gradient:')) b.style.background = `linear-gradient(135deg, ${(GRADIENTS[c.slice(9)]?.colors || []).join(',')})`;
+      else if (c) b.style.background = c;
       b.addEventListener('click', () => { mark(c); this.change(() => apply(c)); });
       wrap.append(b);
     }
     const custom = h('input', { type: 'color', class: 'sw-custom', 'aria-label': 'その他の色' });
-    if (value && value.startsWith('#')) custom.value = value;
+    if (typeof value === 'string' && value.startsWith('#')) custom.value = value;
     custom.addEventListener('input', () => { this.beginEdit(); apply(custom.value); mark(custom.value); this.live(); });
     custom.addEventListener('change', () => this.endEdit());
     wrap.append(custom);
@@ -667,12 +708,13 @@ class App {
     if (sel.type === 'audio') this.#audioSheet(item);
     if (sel.type === 'shape') this.#shapeSheet(item);
     if (sel.type === 'effect') this.#effectSheet(item);
+    if (sel.type === 'overlay') this.#overlaySheet(item, section);
   }
 
   #clipSheet(c, section) {
     const media = this.project.media[c.media];
     const isImg = media?.kind === 'image';
-    const titles = { speed: '速度', volume: '音量', frame: '表示', color: '色調整' };
+    const titles = { speed: '速度', volume: '音量', frame: '表示', color: '色調整', cutout: '切り抜き' };
     this.openSheet(titles[section] || 'クリップ', (body) => {
       const secs = {
         speed: () => [
@@ -707,6 +749,11 @@ class App {
             }[v];
             setTimeout(() => { this.closeSheet(); this.openInspector('color'); });
           }),
+        ],
+        cutout: () => [
+          ...this.#cutoutSection(c, 'clip', () => { this.closeSheet(); this.openInspector('cutout'); }),
+          c.cutout?.mode ? this.seg('切り抜いた後ろ', [['color', '背景色'], ['blur', '元の映像をぼかす']], c.cutout.bg || 'color', (v) => { c.cutout.bg = v; }) : null,
+          h('p', { class: 'note' }, '背景色は「比率・設定」で変えられます。別の映像の上に人物を重ねたいときは、人物の動画を「ワイプ」で追加して切り抜いてください。'),
         ],
       };
       const order = section ? [section] : (isImg ? ['frame', 'color'] : ['speed', 'volume', 'frame', 'color']);
@@ -755,16 +802,25 @@ class App {
       }));
 
       body.append(
-        this.slider('大きさ', tx.size, 0.03, 0.2, 0.005, (v) => `${Math.round(v * 1000)}`, (v) => { tx.size = v; }),
-        this.seg('位置', [[0.12, '上'], [0.5, '中央'], [0.8, '下'], [0.9, '一番下']], null, (v) => { tx.y = v; tx.x = 0.5; }),
+        this.slider('大きさ', this.cur(tx).size, 0.03, 0.2, 0.005, (v) => `${Math.round(v * 1000)}`, (v) => { this.kfTarget(tx).size = v; }),
+        this.seg('位置', [[0.12, '上'], [0.5, '中央'], [0.8, '下'], [0.9, '一番下']], null, (v) => { const k = this.kfTarget(tx); k.y = v; k.x = 0.5; }),
         this.seg('書体', [['gothic', 'ゴシック'], ['rounded', '丸ゴシック'], ['mincho', '明朝']], tx.font, (v) => { tx.font = v; }),
-        this.swatches('文字の色', ['#ffffff', '#111111', '#ffe14d', '#ff4f8b', '#4fc3ff', '#5fe08a', '#ff7a3d'], tx.color, (v) => { tx.color = v; }),
+        this.swatches('文字の色', ['#ffffff', '#111111', '#ffe14d', '#ff4f8b', '#4fc3ff', '#5fe08a', '#ff7a3d', 'gradient:gold', 'gradient:silver', 'gradient:rainbow', 'gradient:sunset', 'gradient:ocean', 'gradient:sakura'], tx.color, (v) => { tx.color = v; }),
         this.swatches('ふちの色', ['#000000', '#ffffff', '#ff4f8b', '#2a6cff', '#ff7a3d'], tx.stroke, (v) => { tx.stroke = v; if (v && !(tx.strokeWidth > 0)) tx.strokeWidth = 0.15; }, true),
         this.slider('ふちの太さ', tx.strokeWidth || 0, 0, 0.35, 0.01, (v) => `${Math.round(v * 100)}`, (v) => { tx.strokeWidth = v; }),
         this.swatches('背景', ['rgba(0,0,0,0.6)', '#000000', '#ffffff', '#ffe14d', '#ff4f8b'], tx.bg, (v) => { tx.bg = v; }, true),
         this.toggle('影', tx.shadow, (v) => { tx.shadow = v; }),
+        this.seg('装飾', [['none', 'なし'], ['glow', '光彩'], ['extrude', '立体'], ['double', '二重ふち']], tx.glow ? 'glow' : tx.extrude ? 'extrude' : tx.strokes?.length ? 'double' : 'none', (v) => {
+          tx.glow = v === 'glow' ? { color: typeof tx.stroke === 'string' && tx.stroke !== '#000000' ? tx.stroke : '#ff2bd6', size: 0.5 } : null;
+          tx.extrude = v === 'extrude' ? { depth: 0.12, color: '#333333', angle: 135 } : null;
+          tx.strokes = v === 'double' ? [{ color: '#111111', width: (tx.strokeWidth || 0.12) * 2 }] : null;
+          if (v === 'double' && !(tx.strokeWidth > 0)) { tx.stroke = '#ffffff'; tx.strokeWidth = 0.12; }
+        }),
         this.seg('出かた', [['none', 'なし'], ['fade', 'フェード'], ['pop', 'ポップ'], ['slide', 'スライド'], ['typewriter', 'タイプ']], tx.anim, (v) => { tx.anim = v; }),
+        this.slider('回転', this.cur(tx).rotation || 0, -180, 180, 1, (v) => `${Math.round(v)}°`, (v) => { this.kfTarget(tx).rotation = v; }),
+        ...this.#threeDSection(tx),
         this.#motionSeg(tx, null, () => { this.closeSheet(); this.openInspector(); }),
+        ...this.#keySection(tx, () => { this.closeSheet(); this.openInspector(); }),
         h('div', { class: 'sec' },
           h('div', { class: 'lbl' }, h('span', {}, '表示時間'), h('output', {}, `${fmt(tx.start)} 〜 ${fmt(tx.end)}`)),
           h('div', { class: 'row-btns' },
@@ -801,7 +857,7 @@ class App {
     this.select({ type: 'clip', id: clipId });
     this.openSheet(idx === 0 ? '始まりの効果' : '切り替え効果', (body) => {
       const grid = h('div', { class: 'trans-grid' });
-      const ic = { none: '✕', fade: '◐', black: '■', white: '□', slide: '⇢', wipe: '▥', zoom: '⤢' };
+      const ic = { none: '✕', fade: '◐', black: '■', white: '□', slide: '⇢', wipe: '▥', zoom: '⤢', flip: '⟲', cube: '◧' };
       for (const [k, t] of Object.entries(TRANSITIONS)) {
         if (idx === 0 && t.overlap) continue;
         const b = h('button', { type: 'button', class: c.transition.type === k ? 'on' : '' }, h('span', { class: 'ic' }, ic[k]), t.label);
@@ -822,7 +878,7 @@ class App {
             toast('すべての切り替えに適用しました');
           },
         }, 'すべての切り替えに適用')),
-        h('p', { class: 'note' }, idx === 0 ? '最初のクリップは「黒/白からフェードイン」にできます。' : 'クロスフェード・スライド・ワイプ・ズームは前後のクリップが少し重なります。'));
+        h('p', { class: 'note' }, idx === 0 ? '最初のクリップは「黒/白からフェードイン」にできます。' : 'クロスフェード・スライド・ワイプ・ズーム・3D は前後のクリップが少し重なります。'));
     });
   }
 
@@ -880,27 +936,204 @@ class App {
       const motion = s.to ? Object.keys(s.to).join(',') : 'none';
       body.append(
         h('div', { class: 'sec' }, h('div', { class: 'lbl' }, h('span', {}, '形')), grid),
-        hollow ? null : this.swatches('塗り', ['#ff7a3d', '#ffcc33', '#ff4f8b', '#4fc3ff', '#5fe08a', '#b07bff', '#ffffff', '#111111'], s.fill, (v) => { s.fill = v; }, true),
+        hollow ? null : this.swatches('塗り', ['#ff7a3d', '#ffcc33', '#ff4f8b', '#4fc3ff', '#5fe08a', '#b07bff', '#ffffff', '#111111', 'gradient:gold', 'gradient:silver', 'gradient:rainbow', 'gradient:sunset', 'gradient:ocean', 'gradient:sakura', 'gradient:neon'], s.fill, (v) => { s.fill = v; }, true),
         this.swatches(hollow ? '線の色' : 'ふち', ['#ffffff', '#111111', '#ffcc33', '#ff4f8b', '#4fc3ff'], s.stroke, (v) => { s.stroke = v; if (v && !(s.strokeWidth > 0)) s.strokeWidth = 0.01; }, !hollow),
         this.slider(hollow ? '線の太さ' : 'ふちの太さ', s.strokeWidth || 0, 0, 0.05, 0.001, (v) => `${Math.round(v * 1000)}`, (v) => { s.strokeWidth = v; }),
-        this.slider('大きさ', Math.max(s.w, s.h), 0.03, 1.5, 0.01, (v) => `${Math.round(v * 100)}`, (v) => {
-          const r = v / Math.max(s.w, s.h);
-          s.w *= r; s.h *= r;
-          if (s.to) { if (typeof s.to.w === 'number') s.to.w *= r; if (typeof s.to.h === 'number') s.to.h *= r; }
+        this.slider('大きさ', Math.max(this.cur(s).w, this.cur(s).h), 0.03, 1.5, 0.01, (v) => `${Math.round(v * 100)}`, (v) => {
+          const k = this.kfTarget(s);
+          const c = this.cur(s);
+          const r = v / Math.max(c.w, c.h);
+          k.w = c.w * r; k.h = c.h * r;
+          if (k === s && s.to) { if (typeof s.to.w === 'number') s.to.w *= r; if (typeof s.to.h === 'number') s.to.h *= r; }
         }),
-        this.slider('横の長さ', s.w, 0.02, 1.6, 0.01, (v) => `${Math.round(v * 100)}`, (v) => { s.w = v; }),
-        this.slider('縦の長さ', s.h, 0.02, 1.6, 0.01, (v) => `${Math.round(v * 100)}`, (v) => { s.h = v; }),
-        this.slider('回転', s.rotation || 0, -180, 180, 1, (v) => `${Math.round(v)}°`, (v) => { s.rotation = v; }),
-        this.slider('不透明度', s.opacity ?? 1, 0.05, 1, 0.01, (v) => `${Math.round(v * 100)}%`, (v) => { s.opacity = v; }),
+        this.slider('横の長さ', this.cur(s).w, 0.02, 1.6, 0.01, (v) => `${Math.round(v * 100)}`, (v) => { this.kfTarget(s).w = v; }),
+        this.slider('縦の長さ', this.cur(s).h, 0.02, 1.6, 0.01, (v) => `${Math.round(v * 100)}`, (v) => { this.kfTarget(s).h = v; }),
+        this.slider('回転', this.cur(s).rotation || 0, -180, 180, 1, (v) => `${Math.round(v)}°`, (v) => { this.kfTarget(s).rotation = v; }),
+        this.slider('不透明度', this.cur(s).opacity ?? 1, 0.05, 1, 0.01, (v) => `${Math.round(v * 100)}%`, (v) => { this.kfTarget(s).opacity = v; }),
         s.kind === 'round' ? this.slider('角の丸み', s.radius ?? 0.3, 0, 0.5, 0.01, (v) => `${Math.round(v * 200)}%`, (v) => { s.radius = v; }) : null,
         this.toggle('影', s.shadow, (v) => { s.shadow = v; }),
         this.seg('出かた', [['none', 'なし'], ['fade', 'フェード'], ['pop', 'ポップ'], ['slide', 'スライド'], ['spin', '回転'], ['wipe', 'ワイプ']], s.anim, (v) => { s.anim = v; }),
         this.seg('ずっと続く動き', [['none', 'なし'], ['pulse', '鼓動'], ['float', 'ふわふわ'], ['spin', '回転'], ['blink', '点滅'], ['shake', 'ゆれる']], s.loop || 'none', (v) => { s.loop = v; }),
+        ...this.#threeDSection(s),
         this.#motionSeg(s, motion, reopen),
+        ...this.#keySection(s, reopen),
         this.#timingButtons(s, reopen),
         h('p', { class: 'note' }, 'プレビューの図形を指でドラッグすると位置を動かせます。'),
       );
       this.#seekInto(s);
+    });
+  }
+
+  /* ---- キーフレーム ---- */
+
+  /** 再生ヘッドの時刻での見た目（キーフレーム・動きを反映した値） */
+  cur(item) { return withMotion(item, this.player.t); }
+
+  /**
+   * 変更の書き込み先。キーフレームがあれば再生ヘッド位置のキー（なければ作る）、なければ本体。
+   * キーフレームを使い始めると「動かしたいところに再生ヘッドを合わせて変更」するだけで動きが作れる。
+   */
+  kfTarget(item) {
+    if (!item.keys?.length) return item;
+    const len = itemEnd(item) - item.start;
+    const local = Math.min(len, Math.max(0, this.player.t - item.start));
+    const tol = 0.5 / (this.project.fps || 30);
+    let k = item.keys.find((x) => Math.abs(x.t - local) <= tol);
+    if (!k) {
+      const c = withMotion(item, this.player.t);
+      k = { t: Math.round(local * 1000) / 1000 };
+      for (const p of ANIM_PROPS) if (typeof c[p] === 'number') k[p] = c[p];
+      item.keys.push(k);
+      item.keys.sort((a, b) => a.t - b.t);
+    }
+    return k;
+  }
+
+  #keySection(item, reopen) {
+    const len = itemEnd(item) - item.start;
+    const local = this.player.t - item.start;
+    const tol = 0.5 / (this.project.fps || 30);
+    const keys = item.keys || [];
+    const here = keys.find((k) => Math.abs(k.t - local) <= tol);
+    const chips = h('div', { class: 'seg' }, ...keys.map((k) => {
+      const b = h('button', { type: 'button', class: k === here ? 'on' : '' }, `◆ ${k.t.toFixed(2)}s`);
+      b.onclick = () => { this.player.seek(item.start + k.t); reopen(); };
+      return b;
+    }));
+    const add = () => {
+      this.change(() => {
+        if (!item.keys?.length) {
+          // 「to」の動きがあればキーフレームに置き換える
+          item.keys = item.to ? keyStates(item).map((st) => ({ t: st.t, ...st.v, ...(st.ease ? { ease: st.ease } : {}) })) : [];
+          item.to = null;
+          if (!item.keys.length) {
+            const c = withMotion(item, this.player.t);
+            const k = { t: Math.round(Math.min(len, Math.max(0, local)) * 1000) / 1000 };
+            for (const p of ANIM_PROPS) if (typeof c[p] === 'number') k[p] = c[p];
+            item.keys.push(k);
+          }
+        }
+        this.kfTarget(item);
+      });
+      reopen();
+      toast('キーを追加しました。別の時刻に移動して位置や大きさを変えると、その間が動きます');
+    };
+    return [
+      h('div', { class: 'sec' },
+        h('div', { class: 'lbl' }, h('span', {}, `キーフレーム（${keys.length}個）`)),
+        keys.length ? chips : null,
+        h('div', { class: 'row-btns', style: 'margin-top:8px' },
+          h('button', { class: 'btn', type: 'button', onclick: add }, here ? '◆ このキーを更新' : '◆ ここにキーを追加'),
+          here ? h('button', { class: 'btn', type: 'button', onclick: () => { this.change(() => { item.keys = item.keys.filter((k) => k !== here); if (!item.keys.length) item.keys = null; }); reopen(); } }, 'このキーを削除') : null,
+          keys.length ? h('button', { class: 'btn danger', type: 'button', onclick: () => {
+            this.change(() => { const c = withMotion(item, this.player.t); for (const p of ANIM_PROPS) if (typeof c[p] === 'number') item[p] = c[p]; item.keys = null; });
+            reopen();
+          } }, 'すべて削除') : null)),
+      h('p', { class: 'note' }, keys.length
+        ? 'キーがある間は、再生ヘッドの位置で動かしたり大きさを変えたりすると、その時刻のキーとして記録されます。'
+        : '動かしたい最初の時刻で「キーを追加」→ 再生ヘッドを動かして位置・大きさ・回転・3D を変えると、その間がなめらかにつながります。'),
+    ];
+  }
+
+  #threeDSection(item) {
+    return [
+      this.slider('3D 縦軸の回転（左右に向く）', this.cur(item).ry || 0, -180, 180, 1, (v) => `${Math.round(v)}°`, (v) => { this.kfTarget(item).ry = v; }),
+      this.slider('3D 横軸の回転（前後に倒れる）', this.cur(item).rx || 0, -85, 85, 1, (v) => `${Math.round(v)}°`, (v) => { this.kfTarget(item).rx = v; }),
+    ];
+  }
+
+  /* ---- 切り抜き ---- */
+
+  #cutoutSection(item, type, reopen) {
+    const c = item.cutout;
+    const mode = c?.mode || 'none';
+    const out = [
+      this.seg('切り抜き', [['none', 'なし'], ['person', '人物（AI）'], ['object', 'タップした物（AI）'], ['chroma', 'グリーンバック']], mode, (v) => {
+        if (v === 'none') item.cutout = null;
+        else item.cutout = { ...(item.cutout || {}), mode: v, ...(v === 'chroma' && !item.cutout?.color ? { color: '#00b140', tolerance: 0.3, softness: 0.1 } : {}), ...(v === 'object' && item.cutout?.x == null ? { x: 0.5, y: 0.5 } : {}) };
+        if (v === 'person' || v === 'object') this.#prepareAI(v);
+        setTimeout(reopen);
+      }),
+    ];
+    if (mode === 'chroma') {
+      out.push(
+        this.swatches('抜く色', ['#00b140', '#00ff00', '#0047bb', '#0000ff'], c.color, (v) => { item.cutout.color = v; }),
+        this.slider('抜く範囲', c.tolerance ?? 0.3, 0.02, 0.8, 0.01, (v) => `${Math.round(v * 100)}`, (v) => { item.cutout.tolerance = v; }),
+        this.slider('境目のなめらかさ', c.softness ?? 0.1, 0, 0.5, 0.01, (v) => `${Math.round(v * 100)}`, (v) => { item.cutout.softness = v; }),
+      );
+    }
+    if (mode === 'object') {
+      out.push(h('div', { class: 'sec' },
+        h('button', { class: 'btn primary', type: 'button', onclick: () => { this.pickPoint = { type, id: item.id, reopen }; toast('プレビューで切り抜きたい物をタップしてください', 4000); } }, '切り抜く物をタップして選ぶ'),
+        h('p', { class: 'note' }, `今の位置：横 ${Math.round((c.x ?? 0.5) * 100)}% / 縦 ${Math.round((c.y ?? 0.5) * 100)}%。動画では、その位置にある物を毎コマ切り抜きます（大きく動く物は外れることがあります）。`)));
+    }
+    if (mode === 'person' || mode === 'object') {
+      out.push(this.toggle('反転（背景のほうを残す）', !!c.invert, (v) => { item.cutout.invert = v; }));
+      if (!cutoutReady(mode === 'object' ? 'object' : 'person')) out.push(h('p', { class: 'note' }, 'AI を準備中です（初回のみ数秒〜。完了するとプレビューに反映されます）'));
+    }
+    return out;
+  }
+
+  #prepareAI(mode) {
+    const kind = mode === 'object' ? 'object' : 'person';
+    if (cutoutReady(kind)) return;
+    toast('切り抜き AI を準備中…（初回のみ）', 8000);
+    loadCutout(kind).then(() => toast('切り抜き AI の準備ができました')).catch((err) => toast('AI を読み込めませんでした：' + err.message, 5000));
+  }
+
+  /* ---- ワイプ（重ねた映像） ---- */
+
+  async addOverlay(file) {
+    const p = this.project;
+    toast(`読み込み中… ${file.name}`, 60000);
+    try {
+      const meta = await this.lib.add(file);
+      if (meta.kind === 'audio') throw new Error('動画か写真を選んでください');
+      await store.putMedia(p.id, meta, file);
+      const t = Math.min(this.player.t, Math.max(0, this.player.duration - 0.5));
+      const o = newOverlay(meta, t);
+      this.change(() => { p.media[meta.id] = meta; p.overlays.push(o); });
+      this.select({ type: 'overlay', id: o.id });
+      toast('ワイプを追加しました。プレビューでドラッグして位置を調整できます');
+      this.openInspector();
+    } catch (err) {
+      toast(`${file.name}：${err.message}`, 4000);
+    }
+  }
+
+  #overlaySheet(o, section) {
+    const reopen = () => { this.closeSheet(); this.openInspector(section); };
+    const media = this.project.media[o.media];
+    if (section === 'cutout') {
+      this.openSheet('切り抜き', (body) => {
+        body.append(...this.#cutoutSection(o, 'overlay', reopen).filter(Boolean),
+          h('p', { class: 'note' }, '人物の切り抜きは、背景と人がはっきり分かれている映像ほどきれいに抜けます。グリーンバックで撮った映像なら「グリーンバック」がいちばん正確です。'));
+        this.#seekInto(o);
+      });
+      return;
+    }
+    this.openSheet('ワイプ', (body) => {
+      body.append(
+        h('p', { class: 'note' }, media?.name || ''),
+        this.slider('大きさ', this.cur(o).w, 0.05, 1.6, 0.01, (v) => `${Math.round(v * 100)}`, (v) => { this.kfTarget(o).w = v; }),
+        this.slider('回転', this.cur(o).rotation || 0, -180, 180, 1, (v) => `${Math.round(v)}°`, (v) => { this.kfTarget(o).rotation = v; }),
+        this.slider('不透明度', this.cur(o).opacity ?? 1, 0.05, 1, 0.01, (v) => `${Math.round(v * 100)}%`, (v) => { this.kfTarget(o).opacity = v; }),
+        this.seg('形', [['none', '四角'], ['round', '角丸'], ['circle', '丸']], o.mask, (v) => { o.mask = v; }),
+        o.mask === 'round' ? this.slider('角の丸み', o.radius ?? 0.08, 0, 0.5, 0.01, (v) => `${Math.round(v * 200)}%`, (v) => { o.radius = v; }) : null,
+        this.swatches('ふちの色', ['#ffffff', '#111111', '#ffcc33', '#ff4f8b', '#4fc3ff'], o.borderColor, (v) => { o.borderColor = v; }),
+        this.slider('ふちの太さ', o.border || 0, 0, 0.03, 0.001, (v) => `${Math.round(v * 1000)}`, (v) => { o.border = v; }),
+        this.toggle('影', o.shadow, (v) => { o.shadow = v; }),
+        media?.kind === 'video' ? this.slider('音量', o.volume ?? 1, 0, 2, 0.05, (v) => (v === 0 ? 'ミュート' : `${Math.round(v * 100)}%`), (v) => { o.volume = v; }) : null,
+        this.seg('出かた', [['none', 'なし'], ['fade', 'フェード'], ['pop', 'ポップ'], ['slide', 'スライド'], ['spin', '回転'], ['wipe', 'ワイプ']], o.anim, (v) => { o.anim = v; }),
+        this.seg('ずっと続く動き', [['none', 'なし'], ['pulse', '鼓動'], ['float', 'ふわふわ'], ['shake', 'ゆれる']], o.loop || 'none', (v) => { o.loop = v; }),
+        ...this.#threeDSection(o),
+        ...this.#keySection(o, reopen),
+        h('div', { class: 'sec' }, h('div', { class: 'row-btns' },
+          h('button', { class: 'btn', type: 'button', onclick: () => { this.closeSheet(); this.openInspector('cutout'); } }, '✂ 切り抜き…'),
+          h('button', { class: 'btn', type: 'button', onclick: () => { this.change(() => { o.start = this.player.t; }); reopen(); } }, 'ここから表示'))),
+        h('p', { class: 'note' }, 'プレビューでドラッグして位置を動かせます。タイムラインの「重ね」の段で長さや表示時間を調整できます。'),
+      );
+      this.#seekInto(o);
     });
   }
 
@@ -936,7 +1169,8 @@ class App {
   }
 
   #seekInto(item) {
-    if (this.player.t < item.start || this.player.t >= item.end) this.player.seek(item.start + Math.min(0.5, (item.end - item.start) / 2));
+    const end = itemEnd(item);
+    if (this.player.t < item.start || this.player.t >= end) this.player.seek(item.start + Math.min(0.5, (end - item.start) / 2));
   }
 
   /* ---- エフェクト ---- */
@@ -1077,14 +1311,23 @@ class App {
   pasteJsonSheet() {
     this.openSheet('JSONを貼り付け', (body) => {
       const ta = h('textarea', { rows: '10', placeholder: '{ "clips": [...], "texts": [...] }' });
-      body.append(ta, h('div', { class: 'sec' }, h('button', {
+      const report = h('ul', { class: 'note' });
+      body.append(ta, report, h('div', { class: 'sec' }, h('button', {
         class: 'btn primary wide', type: 'button', onclick: () => {
+          let data;
+          try { data = JSON.parse(ta.value); } catch (err) { return toast('JSON として読めません：' + err.message, 5000); }
+          const v = validateProject({ ...data, media: { ...this.project.media, ...(data.media || {}) } });
+          report.textContent = '';
+          if (v.errors.length || v.warnings.length) {
+            report.append(...v.errors.map((e) => h('li', { style: 'color:var(--danger)' }, e)), ...v.warnings.map((w) => h('li', {}, w)));
+          }
+          if (v.errors.length) return toast(`エラーが ${v.errors.length} 件あります（下に表示）`, 4000);
           try {
-            this.applyJson(JSON.parse(ta.value));
-            this.closeSheet();
-            toast('反映しました（元に戻すボタンで取り消せます）');
+            this.applyJson(data);
+            if (!v.warnings.length) this.closeSheet();
+            toast(v.warnings.length ? `反映しました（注意 ${v.warnings.length} 件）` : '反映しました（元に戻すボタンで取り消せます）', 4000);
           } catch (err) {
-            toast('読み込めませんでした：' + err.message, 4000);
+            toast('読み込めませんでした：' + err.message, 5000);
           }
         },
       }, '反映する')), h('p', { class: 'note' }, '今の素材をそのまま使い、編集内容だけを置き換えます。'));
@@ -1110,9 +1353,10 @@ class App {
       media: p.media,
       clips: (data.clips || p.clips).map(fix),
       audios: (data.audios || p.audios).map(fix),
+      overlays: (data.overlays || p.overlays).map(fix),
       texts: data.texts || p.texts,
     });
-    for (const x of [...merged.clips, ...merged.audios]) if (!merged.media[x.media]) throw new Error(`素材 ${x.media} が見つかりません`);
+    for (const x of [...merged.clips, ...merged.audios, ...merged.overlays]) if (!merged.media[x.media]) throw new Error(`素材 ${x.media} が見つかりません`);
     this.change(() => { this.project = merged; });
     this.select(null);
   }
@@ -1281,6 +1525,7 @@ class App {
       const t = this.player.t;
       const W = cv.width, H = cv.height;
       const ctx = cv.getContext('2d');
+      if (this.pickPoint) { this.#pickCutoutPoint(pt, W, H); return; }
       // 上に描かれているテキストから順に当たり判定
       const inside = (b) => {
         const m = 12;
@@ -1291,11 +1536,13 @@ class App {
       const cands = [
         ...[...this.project.texts].reverse().map((x) => ({ type: 'text', item: x })),
         ...[...this.project.shapes].reverse().map((x) => ({ type: 'shape', item: x })),
-      ].filter(({ type, item }) => t >= item.start && t < item.end &&
-        inside(type === 'text' ? measureText(ctx, W, H, item, t).box : shapeBox(W, H, item, t).box));
+        ...[...this.project.overlays].reverse().map((x) => ({ type: 'overlay', item: x })),
+      ].filter(({ type, item }) => t >= item.start && t < itemEnd(item) &&
+        inside(type === 'text' ? measureText(ctx, W, H, item, t).box : type === 'shape' ? shapeBox(W, H, item, t).box : this.#overlayBox(W, H, item, t).box));
       const hit = cands.find((c) => sel && c.type === sel.type && c.item.id === sel.id) || cands[0];
       if (hit) {
-        drag = { type: hit.type, item: hit.item, x0: pt.x, y0: pt.y, ox: hit.item.x, oy: hit.item.y, moved: false };
+        const c = withMotion(hit.item, t);
+        drag = { type: hit.type, item: hit.item, x0: pt.x, y0: pt.y, ox: c.x, oy: c.y, moved: false };
         if (!(sel?.type === hit.type && sel.id === hit.item.id)) this.select({ type: hit.type, id: hit.item.id });
       } else if (sel?.type === 'clip') {
         const c = this.findItem('clip', sel.id);
@@ -1315,14 +1562,16 @@ class App {
       this.beginEdit();
       let nx = drag.ox + dx, ny = drag.oy + dy;
       const guides = [];
-      if (drag.type === 'text' || drag.type === 'shape') {
+      if (drag.type === 'text' || drag.type === 'shape' || drag.type === 'overlay') {
         // 動き（to）がある場合は、終点も同じだけずらす
         if (drag.item.to && !drag.toOrig) drag.toOrig = { ...drag.item.to };
         if (Math.abs(nx - 0.5) < 0.025) { nx = 0.5; guides.push('v'); }
         if (Math.abs(ny - 0.5) < 0.02) { ny = 0.5; guides.push('h'); }
-        drag.item.x = Math.max(-0.5, Math.min(1.5, nx));
-        drag.item.y = Math.max(-0.5, Math.min(1.5, ny));
-        if (drag.toOrig) {
+        // キーフレームがあれば、再生ヘッド位置のキーを動かす
+        const target = this.kfTarget(drag.item);
+        target.x = Math.max(-0.5, Math.min(1.5, nx));
+        target.y = Math.max(-0.5, Math.min(1.5, ny));
+        if (drag.toOrig && target === drag.item) {
           if (typeof drag.toOrig.x === 'number') drag.item.to.x = drag.toOrig.x + (drag.item.x - drag.ox);
           if (typeof drag.toOrig.y === 'number') drag.item.to.y = drag.toOrig.y + (drag.item.y - drag.oy);
         }
@@ -1354,6 +1603,41 @@ class App {
     cv.addEventListener('pointercancel', end);
   }
 
+  /** 重ねた映像の表示枠（素材の縦横比を使う） */
+  #overlayBox(W, H, o, t) {
+    const m = this.project.media[o.media] || {};
+    return overlayBox(W, H, o, t, m.width, m.height);
+  }
+
+  /** 「タップした物」の切り抜き位置を、プレビューのタップから決める */
+  #pickCutoutPoint(pt, W, H) {
+    const { type, id, reopen } = this.pickPoint;
+    this.pickPoint = null;
+    const item = this.findItem(type, id);
+    if (!item?.cutout) return;
+    const m = this.project.media[item.media] || {};
+    const px = pt.x * W, py = pt.y * H;
+    let rx, ry;
+    if (type === 'overlay') {
+      const b = this.#overlayBox(W, H, item, this.player.t);
+      const s = Math.max(b.dw / (m.width || 1), b.dh / (m.height || 1));
+      const iw = (m.width || 1) * s, ih = (m.height || 1) * s;
+      rx = (px - (b.cx - iw / 2)) / iw;
+      ry = (py - (b.cy - ih / 2)) / ih;
+    } else {
+      const fit = item.fit === 'contain' ? Math.min(W / m.width, H / m.height) : Math.max(W / m.width, H / m.height);
+      const s = fit * (item.zoom || 1);
+      const dw = m.width * s, dh = m.height * s;
+      const cx = W / 2 + (item.x || 0) * W, cy = H / 2 + (item.y || 0) * H;
+      rx = (px - (cx - dw / 2)) / dw;
+      ry = (py - (cy - dh / 2)) / dh;
+    }
+    if (!(rx >= 0 && rx <= 1 && ry >= 0 && ry <= 1)) { toast('素材の中をタップしてください'); return; }
+    this.change(() => { item.cutout.x = Math.round(rx * 1000) / 1000; item.cutout.y = Math.round(ry * 1000) / 1000; });
+    toast('切り抜く物を選びました');
+    reopen?.();
+  }
+
   /* ================= イベント ================= */
 
   #bind() {
@@ -1368,6 +1652,7 @@ class App {
     $('#zoomOut').addEventListener('click', () => this.timeline.zoom(1 / 1.5));
     $('#sheetDone').addEventListener('click', () => this.closeSheet());
     $('#fileMedia').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) this.addFiles(f); });
+    $('#fileOverlay').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) this.addOverlay(f); });
     $('#fileAudio').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) this.addFiles(f, { asAudio: true }); });
     $('#importJson').addEventListener('click', () => $('#fileJson').click());
     $('#fileJson').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) this.importFromJson(f); });
@@ -1394,6 +1679,23 @@ class App {
 }
 
 /* ================= ユーティリティ ================= */
+
+/** 分割したとき、前半 a と後半 b の動き（to / keys）をつなぎ目で途切れないように分ける */
+function splitMotion(a, b, t) {
+  const local = t - a.start;
+  const mid = withMotion(a, t);
+  const state = {};
+  for (const p of ANIM_PROPS) if (typeof mid[p] === 'number') state[p] = mid[p];
+  if (a.keys?.length) {
+    const ks = a.keys;
+    a.keys = [...ks.filter((k) => k.t < local - 1e-6), { t: local, ...state }];
+    b.keys = [{ t: 0, ...state }, ...ks.filter((k) => k.t > local + 1e-6).map((k) => ({ ...k, t: k.t - local }))];
+  } else if (a.to) {
+    const firstTo = {};
+    for (const k of Object.keys(a.to)) { firstTo[k] = mid[k]; b[k] = mid[k]; }
+    a.to = firstTo;
+  }
+}
 
 function ratioOf(p) {
   const k = presetOf(p);

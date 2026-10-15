@@ -1,9 +1,9 @@
 /* つなぐ：オフラインでも開けるようにアプリ本体をキャッシュ（ネット優先） */
-const CACHE = 'tsunagu-v2';
+const CACHE = 'tsunagu-v3';
 const ASSETS = [
   './', 'index.html', 'css/editor.css', 'manifest.webmanifest',
   'js/app.js', 'js/player.js', 'js/timeline.js', 'js/store.js',
-  'js/engine/project.js', 'js/engine/render.js', 'js/engine/media.js', 'js/engine/audio.js', 'js/engine/exporter.js', 'js/engine/fx.js',
+  'js/engine/project.js', 'js/engine/render.js', 'js/engine/media.js', 'js/engine/audio.js', 'js/engine/exporter.js', 'js/engine/fx.js', 'js/engine/cutout.js', 'js/engine/warp3d.js', 'js/engine/validate.js',
   'lib/mediabunny.min.mjs', '../js/mp4.js',
   'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
 ];
