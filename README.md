@@ -11,7 +11,7 @@ iPhone の画面収録やカメラで撮った動画から、**音声だけを�
 
 | 機能 | 内容 |
 | --- | --- |
-| 音声の取り出し | MOV / MP4 などの動画 → MP3（64〜320kbps）または WAV |
+| 音声の取り出し | MOV / MP4 などの動画 → MP3（64〜320kbps）、WAV、または M4A（再エンコードなし・劣化ゼロ） |
 | 音量の統一 | ラウドネス（LUFS, ITU-R BS.1770）またはピークで複数ファイルの音量をそろえる。音割れ防止のリミッター付き |
 | リネーム | ファイルごとの名前変更、パターン（`{name}` `{n}` `{date}` `{time}`）・連番・置換による一括リネーム |
 | トリミング | 波形を見ながら開始・終了位置を指定、試聴 |
@@ -37,6 +37,7 @@ iPhone では Safari で開き、共有ボタン →「ホーム画面に追加�
 - `index.html` / `css/style.css` — 画面
 - `js/app.js` — 画面の操作、デコード（Web Audio API）、共有・ダウンロード
 - `js/worker.js` — 解析・音量統一・リミッター・エンコード（Web Worker）
+- `js/mp4.js` — MOV/MP4 から AAC 音声トラックを取り出し、M4A / ADTS に組み直す（Safari が .mov を直接デコードできないため）
 - `js/zip.js` — ZIP 作成
 - `lib/lame.min.js` — MP3 エンコーダー [lamejs](https://github.com/zhuker/lamejs)（LGPL, `lib/LICENSE.lamejs`）
 - `sw.js` / `manifest.webmanifest` — オフライン対応・ホーム画面アイコン
@@ -46,4 +47,4 @@ iPhone では Safari で開き、共有ボタン →「ホーム画面に追加�
 ## 注意
 
 - 音声は端末のメモリに展開して処理するため、極端に長い動画（目安：iPhone で1本60分超）は途中で止まることがあります。
-- MOV/MP4 の読み込みはブラウザの対応形式に依存します（iPhone の Safari では問題なく読み込めます）。
+- 動画内の音声が AAC 以外（リニアPCMなど）の場合は、ブラウザが直接読める形式でない限り変換できません。

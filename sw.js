@@ -1,5 +1,5 @@
 /* オフラインでも使えるようにアプリ本体をキャッシュする */
-const CACHE = 'otodake-v2';
+const CACHE = 'otodake-v3';
 const ASSETS = [
   './',
   'index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   'js/app.js',
   'js/worker.js',
   'js/zip.js',
+  'js/mp4.js',
   'lib/lame.min.js',
   'manifest.webmanifest',
   'icons/icon.svg',

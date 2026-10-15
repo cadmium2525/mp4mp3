@@ -1,4 +1,5 @@
 import { makeZip } from './zip.js';
+import { extractAudioTrack, buildM4a, buildAdts, sliceTrack } from './mp4.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -54,6 +55,10 @@ function updateConditional() {
     const [k, v] = el.dataset.showIf.split('=');
     el.hidden = String(settings[k]) !== v;
   }
+  for (const el of $$('[data-hide-if]')) {
+    const [k, v] = el.dataset.hideIf.split('=');
+    el.hidden = String(settings[k]) === v;
+  }
   const ext = settings.format;
   for (const it of state.items) it.refs.ext.textContent = '.' + ext;
   updateSettingsSummary();
@@ -61,6 +66,7 @@ function updateConditional() {
 }
 
 function updateSettingsSummary() {
+  if (settings.format === 'm4a') { $('#settingsSummary').textContent = 'M4A（劣化なし）'; return; }
   const parts = [settings.format === 'mp3' ? `MP3 ${settings.bitrate}k` : 'WAV'];
   if (settings.channels === '1') parts.push('モノラル');
   if (settings.normMode === 'lufs') parts.push(`音量統一 ${settings.lufsTarget}LUFS`);
@@ -124,16 +130,79 @@ function callWorker(msg, transfer = [], onProgress) {
 
 /* ============ デコード ============ */
 
-async function decodeFile(file, sampleRate) {
-  const data = await file.arrayBuffer();
-  const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  const ctx = new Ctx(1, 1, sampleRate);
+function decodeWith(ctx, data) {
   return new Promise((resolve, reject) => {
     const p = ctx.decodeAudioData(data, resolve, reject);
     if (p && p.then) p.then(resolve, reject);
-  }).catch(() => {
-    throw new Error('音声を読み込めませんでした（音声が入っていない、または対応していない形式の可能性があります）');
   });
+}
+
+/** Blob をデコード。OfflineAudioContext で失敗したら通常の AudioContext でも試す */
+async function decodeBlob(blob, sampleRate) {
+  const data = await blob.arrayBuffer();
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  try {
+    return await decodeWith(new Offline(1, 1, sampleRate), data.slice(0));
+  } catch (err1) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    let ac;
+    try { ac = new AC({ sampleRate }); } catch { ac = new AC(); }
+    try {
+      return await resample(await decodeWith(ac, data), sampleRate);
+    } finally {
+      ac.close && ac.close().catch(() => {});
+    }
+  }
+}
+
+async function resample(buf, sampleRate) {
+  if (buf.sampleRate === sampleRate) return buf;
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const ctx = new Offline(buf.numberOfChannels, Math.ceil(buf.duration * sampleRate), sampleRate);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start();
+  return ctx.startRendering();
+}
+
+/** MOV/MP4 なら音声トラックを取り出しておく（失敗しても item.track = null） */
+async function loadTrack(item) {
+  if (item.track !== undefined) return item.track;
+  try {
+    item.track = await extractAudioTrack(item.file);
+  } catch (err) {
+    item.track = null;
+    item.trackError = err;
+  }
+  return item.track;
+}
+
+/**
+ * ファイルをデコードする。Safari は .mov を直接読めないことがあるので、
+ * 取り出した音声を M4A → ADTS(AAC) → 元ファイルの順に試す。
+ */
+async function decodeItem(item, sampleRate) {
+  const track = await loadTrack(item);
+  const ways = [];
+  if (track) ways.push(['m4a', () => buildM4a(track)], ['adts', () => buildAdts(track)]);
+  if (!track || item.kind === 'audio') ways.push(['raw', () => item.file]);
+  if (item.decodeVia) ways.sort((a, b) => (b[0] === item.decodeVia) - (a[0] === item.decodeVia));
+
+  const errors = [];
+  for (const [via, make] of ways) {
+    try {
+      const buf = await decodeBlob(make(), sampleRate);
+      item.decodeVia = via;
+      return buf;
+    } catch (err) {
+      errors.push(`${via}:${(err && (err.name || err.message)) || err}`);
+    }
+  }
+  const te = item.trackError;
+  if (te && te.code === 'no-audio') throw new Error('この動画には音声が入っていません（画面収録のときにマイクやアプリの音がオフだった可能性があります）');
+  if (te && (te.code === 'codec' || te.code === 'broken')) throw new Error(te.message);
+  throw new Error(`音声を読み込めませんでした（対応していない形式の可能性があります）［${errors.join(' / ')}］`);
 }
 
 function copyChannels(buf) {
@@ -272,6 +341,7 @@ function updateMeta(item) {
     parts.push(trimmed ? `${fmtTime(len)}（元 ${fmtTime(item.duration)}）` : fmtTime(item.duration));
     parts.push(item.numChannels >= 2 ? 'ステレオ' : 'モノラル');
     if (isFinite(item.lufs)) parts.push(`音量 ${item.lufs.toFixed(1)} LUFS`);
+    else if (item.decodeError) parts.push('波形なし（M4A（劣化なし）で保存できます）');
     else parts.push('ほぼ無音');
   }
   m.textContent = '';
@@ -354,7 +424,7 @@ function updateConvertButton() {
   btn.disabled = state.busy || ready === 0;
   if (state.busy) btn.textContent = '変換中…';
   else if (waiting && ready === 0) btn.textContent = '読み込み中…';
-  else btn.textContent = ready > 1 ? (settings.join ? `${ready}件を結合して変換` : `${ready}件を変換する`) : '変換する';
+  else btn.textContent = ready > 1 ? (settings.join && settings.format !== 'm4a' ? `${ready}件を結合して変換` : `${ready}件を変換する`) : '変換する';
 }
 
 $('#clearAll').addEventListener('click', () => {
@@ -373,7 +443,7 @@ async function analyze(item) {
   item.status = 'analyzing';
   updateCard(item);
   try {
-    const buf = await decodeFile(item.file, settings.sampleRate);
+    const buf = await decodeItem(item, settings.sampleRate);
     item.duration = buf.duration;
     item.numChannels = buf.numberOfChannels;
     item.trimStart = 0;
@@ -385,8 +455,25 @@ async function analyze(item) {
     item.peaks = r.peaks;
     item.status = 'ready';
   } catch (err) {
-    item.status = 'error';
-    item.error = err.message;
+    if (item.track) {
+      // デコードできなくても音声トラックは取り出せている → M4A（劣化なし）なら保存できる
+      item.decodeError = err.message;
+      item.duration = item.track.duration;
+      item.numChannels = item.track.channels;
+      item.trimStart = 0;
+      item.trimEnd = item.track.duration;
+      item.lufs = NaN;
+      item.status = 'ready';
+      if (settings.format !== 'm4a') {
+        settings.format = 'm4a';
+        saveSettings();
+        settingsToForm();
+        toast('この動画は「M4A（劣化なし）」で保存できます。出力形式を切り替えました');
+      }
+    } else {
+      item.status = 'error';
+      item.error = err.message;
+    }
   }
   if (!item.removed) updateCard(item);
   updateConvertButton();
@@ -561,7 +648,8 @@ async function convertAll() {
   const s = { ...settings };
   const ext = s.format;
   const n = items.length;
-  const join = s.join && n > 1;
+  const lossless = s.format === 'm4a';
+  const join = s.join && n > 1 && !lossless;
   let channels = s.channels;
   if (join && channels === 'auto') channels = items.some((i) => i.numChannels >= 2) ? 2 : 1;
 
@@ -592,7 +680,16 @@ async function convertAll() {
       const label = `${done + 1}/${steps}  ${item.name}`;
       progress.set(`${label} を読み込み中…`, done / steps);
       try {
-        const buf = await decodeFile(item.file, s.sampleRate);
+        if (lossless) {
+          // 再エンコードせず AAC をそのまま M4A に詰め替える（トリミングのみ反映）
+          const track = await loadTrack(item);
+          if (!track) throw new Error(item.trackError && item.trackError.code === 'no-audio' ? 'この動画には音声が入っていません' : '「M4A（劣化なし）」は MOV/MP4/M4A のファイルだけに使えます。MP3 を選んでください');
+          const t = sliceTrack(track, item.trimStart, item.trimEnd >= item.duration - 0.01 ? Infinity : item.trimEnd);
+          addResult({ name: uniqueName(sanitize(item.name), ext, used), blob: buildM4a(t), stats: { duration: t.duration, lufsOut: NaN } });
+          done++;
+          continue;
+        }
+        const buf = await decodeItem(item, s.sampleRate);
         const chs = copyChannels(buf);
         progress.set(`${label} を処理中…`, (done + 0.3) / steps);
         const name = uniqueName(sanitize(item.name), ext, used);
@@ -608,7 +705,7 @@ async function convertAll() {
       } catch (err) {
         failed++;
         if (join) throw new Error(`${item.name}：${err.message}`);
-        addResult({ name: item.name, error: err.message });
+        addResult({ name: item.name, error: err.message + (item.track && !lossless ? '　→ 出力形式を「M4A（劣化なし）」にすると保存できます' : '') });
       }
       done++;
     }

@@ -119,6 +119,7 @@
             <label for="s-format">ファイル形式</label>
             <select id="s-format" name="format">
               <option value="mp3">MP3（おすすめ・小さい）</option>
+              <option value="m4a">M4A（元の音のまま・劣化なし）</option>
               <option value="wav">WAV（無圧縮・大きい）</option>
             </select>
           </div>
@@ -134,6 +135,8 @@
             </select>
           </div>
         </div>
+        <p class="hint" data-show-if="format=m4a">動画の中の音声をそのまま取り出すので、音質が一切変わらず一番速いです。使える加工はトリミングだけです（音量の統一・無音カット・フェード・結合は使えません）。</p>
+        <div data-hide-if="format=m4a">
         <div class="row2">
           <div class="field">
             <label for="s-channels">チャンネル</label>
@@ -248,6 +251,7 @@
           <label for="s-joinName">結合後のファイル名</label>
           <input id="s-joinName" name="joinName" type="text" placeholder="空なら「先頭のファイル名_結合」" autocomplete="off">
           <p class="hint">一覧の上から順につなげます。順番は各ファイルの ↑↓ や「並べ替え」で変更できます。</p>
+        </div>
         </div>
 
         <div data-show-if="format=mp3">
