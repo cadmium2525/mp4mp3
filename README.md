@@ -22,6 +22,24 @@ iPhone の画面収録やカメラで撮った動画から、**音声だけを�
 
 音声ファイル（MP3 / M4A / WAV など）を入れて、音量統一やリネームだけに使うこともできます。
 
+## つなぐ（動画エディタ）
+
+`editor/` にある、iPhone で使える動画編集アプリです（公開 URL の末尾に `/editor/`）。
+
+- 比率：ショート/リール/TikTok（9:16）、YouTube（16:9）、正方形、インスタ縦長（4:5）
+- カット編集：分割、両端のつまみでトリミング、並べ替え、複製、速度変更（0.25〜4倍）
+- 切り替え効果：クロスフェード、黒/白フェード、スライド、ワイプ、ズーム
+- テキスト：テロップ・字幕・タイトルなど 7 スタイル、プレビュー上でドラッグ配置、アニメーション
+- 音：BGM・効果音の追加、音量、フェード、ループ、クリップごとの音量
+- 映像：画面いっぱい/全体表示、拡大・位置調整、ケン・バーンズ、明るさ・コントラスト・彩度
+- 書き出し：MP4（iPhone では H.264 + AAC）、720p〜4K、共有シートから写真アプリへ保存
+- プロジェクトと素材は端末内（IndexedDB）に自動保存、元に戻す/やり直し
+- 編集内容は JSON でやり取りでき、Claude などの AI に編集を頼める（形式は [editor/PROJECT_FORMAT.md](editor/PROJECT_FORMAT.md)）
+- `node editor/tools/render.mjs project.json 素材フォルダ out.mp4` で PC からも同じエンジンで書き出し可能
+
+動画の読み書きには [Mediabunny](https://mediabunny.dev/)（MPL-2.0, `editor/lib/LICENSE.mediabunny`）を使っています。
+書き出しは WebCodecs を使うため iOS 16.4 以降の Safari が必要です（音声付きの書き出しは iOS 26 以降）。
+
 ## 公開方法（GitHub Pages・0円）
 
 1. GitHub のリポジトリで **Settings → Pages** を開く

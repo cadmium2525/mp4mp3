@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>つなぐ レンダラー</title>
+<!-- tools/render.mjs が使うヘッドレス書き出し用ページ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800&family=Noto+Sans+JP:wght@900&family=Noto+Serif+JP:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+<input type="file" id="files" multiple>
+<canvas id="still"></canvas>
+<script type="module">
+import { MediaLibrary } from './js/engine/media.js';
+import { normalizeProject, layoutClips } from './js/engine/project.js';
+import { exportVideo } from './js/engine/exporter.js';
+import { drawFrame, loadFonts } from './js/engine/render.js';
+
+async function load(projectJson) {
+  const project = { ...projectJson, media: { ...projectJson.media } };
+  const files = [...document.getElementById('files').files];
+  const lib = new MediaLibrary();
+  for (const [id, m] of Object.entries(project.media)) {
+    const f = files.find((x) => x.name === m.name);
+    if (!f) throw new Error(`素材が見つかりません: ${m.name}`);
+    const meta = await lib.add(f, id);
+    // 手書き JSON では kind/duration 等を省略できる（実ファイルから補う）
+    project.media[id] = { ...meta, ...m, duration: meta.duration, width: meta.width, height: meta.height, hasAudio: meta.hasAudio, kind: meta.kind };
+  }
+  return { project: normalizeProject(project), lib };
+}
+
+function save(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.append(a);
+  a.click();
+}
+
+window.renderProject = async (projectJson, opts = {}) => {
+  const { project, lib } = await load(projectJson);
+  const r = await exportVideo(project, lib, { ...opts, onProgress: (p, label) => console.log('progress', Math.round(p * 100), label) });
+  save(r.blob, 'out.mp4');
+  return { codec: r.codec, audioCodec: r.audioCodec, width: r.width, height: r.height, duration: r.duration, size: r.blob.size };
+};
+
+/** 指定時刻の静止画（PNG）を書き出す。構図の確認用 */
+window.renderStill = async (projectJson, t) => {
+  const { project, lib } = await load(projectJson);
+  await loadFonts(project);
+  const c = document.getElementById('still');
+  c.width = project.width; c.height = project.height;
+  const layout = layoutClips(project);
+  const srcs = new Map();
+  const { activeClipsAt, mediaTime } = await import('./js/engine/project.js');
+  for (const it of activeClipsAt(layout, t)) {
+    const rd = lib.frameReader(it.L.clip.media, [mediaTime(it.L, t)], project.width, project.height);
+    srcs.set(it.L.clip.id, await rd.next());
+  }
+  drawFrame(c.getContext('2d'), project, layout, t, (L) => srcs.get(L.clip.id));
+  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+  save(blob, 'still.png');
+  return true;
+};
+window.ready = true;
+</script>
+</body>
+</html>

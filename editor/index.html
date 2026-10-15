@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>つなぐ</title>
+  <meta name="description" content="iPhoneで使える無料の動画編集アプリ。カット、テロップ、BGM、トランジション、YouTube・ショート向けの書き出し。端末内で処理します。">
+  <meta name="theme-color" content="#111113">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="つなぐ">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800&family=Noto+Sans+JP:wght@900&family=Noto+Serif+JP:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+  <!-- ホーム（プロジェクト一覧） -->
+  <section id="home" class="screen">
+    <header class="home-top">
+      <div class="brand">
+        <img src="icons/icon.svg" alt="" width="36" height="36">
+        <div>
+          <h1>つなぐ</h1>
+          <p>スマホで作れる動画エディタ</p>
+        </div>
+      </div>
+      <a class="sublink" href="../">おとだけ ›</a>
+    </header>
+    <div class="home-body">
+      <h2 class="home-h">新しい動画を作る</h2>
+      <div class="presets" id="presets"></div>
+      <div class="home-row">
+        <h2 class="home-h">プロジェクト</h2>
+        <button class="txt-btn" id="importJson" type="button">JSONから作成</button>
+      </div>
+      <ul class="projects" id="projects"></ul>
+      <p class="home-note" id="storageNote"></p>
+      <details class="help">
+        <summary>使い方</summary>
+        <div class="help-body">
+          <p><b>基本：</b>動画や写真を追加 → タイムラインを左右にスクロールして位置を合わせる → 下のボタンで分割・テキスト・音楽などを追加 → 右上の「書き出す」。</p>
+          <p><b>選ぶ・調整：</b>タイムラインのクリップをタップすると選択。もう一度タップで詳細設定。選択中は両端のつまみをドラッグして長さを調整できます。</p>
+          <p><b>テキストの位置：</b>プレビュー上でテキストを指でドラッグ。</p>
+          <p><b>保存先：</b>書き出した動画は「共有」→「ビデオを保存」で写真アプリへ。そこから YouTube・TikTok・Instagram に投稿できます。</p>
+          <p><b>プロジェクトの保存：</b>編集内容と素材はこの端末のブラウザ内に自動保存されます。Safari の履歴・Webサイトデータを消すと消えるので注意。</p>
+          <p><b>Claude と一緒に作る：</b>編集画面の「…」→「JSONをコピー」で編集内容を文字にできます。Claude に「このテロップを直して」などと頼み、返ってきた JSON を「JSONを貼り付け」で反映できます。</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- 編集画面 -->
+  <section id="editor" class="screen" hidden>
+    <header class="ed-top">
+      <button class="icon-btn" id="back" type="button" aria-label="一覧に戻る"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="title-btn" id="projName" type="button"></button>
+      <button class="icon-btn" id="undo" type="button" aria-label="元に戻す"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
+      <button class="icon-btn" id="redo" type="button" aria-label="やり直す"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/></svg></button>
+      <button class="icon-btn" id="menuBtn" type="button" aria-label="メニュー"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+      <button class="export-btn" id="exportBtn" type="button">書き出す</button>
+    </header>
+
+    <div class="stage" id="stage">
+      <canvas id="preview"></canvas>
+    </div>
+
+    <div class="transport">
+      <span class="time" id="time">0:00.0 / 0:00.0</span>
+      <button class="play" id="playBtn" type="button" aria-label="再生">
+        <svg viewBox="0 0 24 24" class="i-play"><path d="M7 4.5v15l12.5-7.5z"/></svg>
+        <svg viewBox="0 0 24 24" class="i-pause"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
+      </button>
+      <div class="zoom">
+        <button class="icon-btn sm" id="zoomOut" type="button" aria-label="縮小"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+        <button class="icon-btn sm" id="zoomIn" type="button" aria-label="拡大"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      </div>
+    </div>
+
+    <div class="tl" id="timeline">
+      <div class="tl-scroll">
+        <div class="tl-content">
+          <div class="tl-ruler"></div>
+          <div class="tl-row tl-video"></div>
+          <div class="tl-row tl-text"></div>
+          <div class="tl-row tl-audio"></div>
+        </div>
+      </div>
+      <div class="tl-labels" aria-hidden="true"><span>映像</span><span>文字</span><span>音</span></div>
+      <div class="tl-playhead"></div>
+    </div>
+
+    <nav class="toolbar" id="toolbar"></nav>
+  </section>
+
+  <!-- ボトムシート（詳細設定） -->
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+  <section class="sheet" id="sheet" hidden aria-modal="true" role="dialog">
+    <header class="sheet-head">
+      <h2 id="sheetTitle"></h2>
+      <button class="done-btn" id="sheetDone" type="button">完了</button>
+    </header>
+    <div class="sheet-body" id="sheetBody"></div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <input type="file" id="fileMedia" accept="video/*,image/*" multiple hidden>
+  <input type="file" id="fileAudio" accept="audio/*,video/*,.mp3,.m4a,.wav,.aac" hidden>
+  <input type="file" id="fileJson" accept="application/json,.json" hidden>
+  <input type="file" id="fileRelink" multiple hidden>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
