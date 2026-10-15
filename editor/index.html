@@ -48,7 +48,7 @@
           <p><b>テキストの位置：</b>プレビュー上でテキストを指でドラッグ。</p>
           <p><b>保存先：</b>書き出した動画は「共有」→「ビデオを保存」で写真アプリへ。そこから YouTube・TikTok・Instagram に投稿できます。</p>
           <p><b>プロジェクトの保存：</b>編集内容と素材はこの端末のブラウザ内に自動保存されます。Safari の履歴・Webサイトデータを消すと消えるので注意。</p>
-          <p><b>Claude と一緒に作る：</b>編集画面の「…」→「JSONをコピー」で編集内容を文字にできます。Claude に「このテロップを直して」などと頼み、返ってきた JSON を「JSONを貼り付け」で反映できます。</p>
+          <p><b>Claude と一緒に作る：</b>編集画面の「…」→「JSONをコピー」と「コマ一覧の画像」を Claude に送ると、映像の中身や話していない区間も伝わります。「無音をカットして」「テロップを付けて」などと頼み、返ってきた JSON を「JSONを貼り付け」で反映できます。</p>
         </div>
       </details>
     </div>
@@ -87,10 +87,11 @@
           <div class="tl-ruler"></div>
           <div class="tl-row tl-video"></div>
           <div class="tl-row tl-text"></div>
+          <div class="tl-row tl-fx"></div>
           <div class="tl-row tl-audio"></div>
         </div>
       </div>
-      <div class="tl-labels" aria-hidden="true"><span>映像</span><span>文字</span><span>音</span></div>
+      <div class="tl-labels" aria-hidden="true"><span>映像</span><span>文字</span><span>効果</span><span>音</span></div>
       <div class="tl-playhead"></div>
     </div>
 

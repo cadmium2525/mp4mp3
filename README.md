@@ -32,9 +32,11 @@ iPhone の画面収録やカメラで撮った動画から、**音声だけを�
 - テキスト：テロップ・字幕・タイトルなど 7 スタイル、プレビュー上でドラッグ配置、アニメーション
 - 音：BGM・効果音の追加、音量、フェード、ループ、クリップごとの音量
 - 映像：画面いっぱい/全体表示、拡大・位置調整、ケン・バーンズ、明るさ・コントラスト・彩度
+- 図形：四角・丸・星・ハート・矢印・吹き出しなど 12 種類、出かた・続く動き・移動/拡大/回転のアニメーション
+- エフェクト：ぼかし、手ぶれ、ズーム鼓動、グリッチ、RGBずれ、モノクロ、周辺減光、フィルム粒子、シネマ帯、フラッシュ、紙吹雪、雪、キラキラ、ハート
 - 書き出し：MP4（iPhone では H.264 + AAC）、720p〜4K、共有シートから写真アプリへ保存
 - プロジェクトと素材は端末内（IndexedDB）に自動保存、元に戻す/やり直し
-- 編集内容は JSON でやり取りでき、Claude などの AI に編集を頼める（形式は [editor/PROJECT_FORMAT.md](editor/PROJECT_FORMAT.md)）
+- 編集内容は JSON でやり取りでき、Claude などの AI に編集を頼める（形式は [editor/PROJECT_FORMAT.md](editor/PROJECT_FORMAT.md)）。無音区間の自動検出と、素材の「コマ一覧」画像の書き出しで、AI に映像の中身も伝えられる
 - `node editor/tools/render.mjs project.json 素材フォルダ out.mp4` で PC からも同じエンジンで書き出し可能
 
 動画の読み書きには [Mediabunny](https://mediabunny.dev/)（MPL-2.0, `editor/lib/LICENSE.mediabunny`）を使っています。

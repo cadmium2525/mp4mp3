@@ -234,7 +234,82 @@ export class MediaLibrary {
     }
     const buf = await e.previewAudio;
     if (buf && !e.peaks) e.peaks = computePeaks(buf, 100);
+    e.previewBuf = buf;
     return buf;
+  }
+
+  /**
+   * 無音（話していない）区間 [[開始, 終了], ...]（秒）。プレビュー用の音声がまだ無ければ null。
+   * -40dB 未満が 0.6 秒以上続くところ。
+   */
+  silences(id, { thresholdDb = -40, minLen = 0.6 } = {}) {
+    const buf = this.get(id)?.previewBuf;
+    if (!buf) return null;
+    const d = buf.getChannelData(0);
+    const win = Math.round(buf.sampleRate * 0.05);
+    const th = Math.pow(10, thresholdDb / 20);
+    const out = [];
+    let start = null;
+    for (let i = 0; i < d.length; i += win) {
+      let sum = 0;
+      const e = Math.min(d.length, i + win);
+      for (let j = i; j < e; j++) sum += d[j] * d[j];
+      const quiet = Math.sqrt(sum / Math.max(1, e - i)) < th;
+      const t = i / buf.sampleRate;
+      if (quiet && start === null) start = t;
+      if (!quiet && start !== null) { if (t - start >= minLen) out.push([start, t]); start = null; }
+    }
+    if (start !== null && buf.duration - start >= minLen) out.push([start, buf.duration]);
+    return out.map(([a, b]) => [Math.round(a * 10) / 10, Math.round(b * 10) / 10]);
+  }
+
+  /**
+   * 素材のコマ一覧画像（時刻つき）。AI に映像の中身を伝えるのに使う。
+   * @returns {Promise<Blob>} JPEG
+   */
+  async contactSheet(id, { maxFrames = 40, cols = 5, cellW = 240 } = {}) {
+    const e = this.get(id);
+    const m = e.meta;
+    const steps = [0.5, 1, 2, 3, 5, 10, 15, 30, 60, 120];
+    const step = steps.find((s) => m.duration / s <= maxFrames) || Math.ceil(m.duration / maxFrames);
+    const times = [];
+    for (let t = 0; t < m.duration - 0.05; t += step) times.push(t);
+    if (!times.length) times.push(0);
+    const cellH = Math.round(cellW * (m.height / m.width || 0.5625));
+    const rows = Math.ceil(times.length / cols);
+    const head = 44;
+    const c = document.createElement('canvas');
+    c.width = cols * cellW;
+    c.height = head + rows * cellH;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${m.name}  長さ ${m.duration.toFixed(1)}秒  ${m.width}×${m.height}  ${step}秒ごと`, 12, head / 2);
+    const label = (t, x, y) => {
+      const txt = `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}${step < 1 ? '.' + Math.round((t % 1) * 10) : ''}`;
+      ctx.font = 'bold 18px sans-serif';
+      const w = ctx.measureText(txt).width + 10;
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(x + 4, y + 4, w, 24);
+      ctx.fillStyle = '#ffcc33';
+      ctx.fillText(txt, x + 9, y + 16);
+    };
+    const reader = this.frameReader(id, times, cellW * 2, cellH * 2);
+    for (let i = 0; i < times.length; i++) {
+      const x = (i % cols) * cellW, y = head + Math.floor(i / cols) * cellH;
+      try {
+        const src = await reader.next();
+        if (src) ctx.drawImage(src.image, x, y, cellW, cellH);
+      } catch { /* 黒いまま */ }
+      ctx.strokeStyle = '#111';
+      ctx.strokeRect(x, y, cellW, cellH);
+      label(times[i], x, y);
+    }
+    reader.close();
+    return new Promise((r) => c.toBlob(r, 'image/jpeg', 0.82));
   }
 
   /** 書き出し用のフレーム取得器（クリップごとに作る） */

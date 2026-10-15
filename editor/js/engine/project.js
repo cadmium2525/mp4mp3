@@ -40,8 +40,41 @@ export function newProject(preset = 'shorts') {
     clips: [],
     texts: [],
     audios: [],
+    shapes: [],
+    effects: [],
     updatedAt: Date.now(),
   };
+}
+
+export function newShape(start, kind = 'round', opts = {}) {
+  const square = ['circle', 'ring', 'star', 'heart', 'burst', 'check', 'triangle'].includes(kind);
+  const wide = kind === 'arrow' || kind === 'line' || kind === 'bubble';
+  return {
+    id: uid('s'),
+    kind,
+    start,
+    end: start + 3,
+    x: 0.5,
+    y: 0.5,
+    w: wide ? 0.5 : square ? 0.3 : 0.45,
+    h: kind === 'line' ? 0.06 : kind === 'arrow' ? 0.16 : kind === 'bubble' ? 0.32 : square ? 0.3 : 0.25,
+    rotation: 0,
+    fill: kind === 'bubble' ? '#ffffff' : '#ff7a3d',
+    stroke: kind === 'bubble' ? '#111111' : null,
+    strokeWidth: kind === 'bubble' ? 0.008 : 0.01,
+    radius: 0.3,
+    opacity: 1,
+    shadow: false,
+    anim: 'pop',
+    loop: 'none',
+    to: null,
+    ease: 'ease',
+    ...opts,
+  };
+}
+
+export function newEffect(start, type = 'flash', opts = {}) {
+  return { id: uid('e'), type, start, end: start + (type === 'flash' ? 0.6 : 2), intensity: 0.6, ...opts };
 }
 
 export function newClip(media, opts = {}) {
@@ -142,7 +175,9 @@ export function layoutClips(project) {
 export function projectDuration(project, layout = layoutClips(project)) {
   let d = layout.length ? layout[layout.length - 1].end : 0;
   for (const t of project.texts) d = Math.max(d, t.end);
-  if (!layout.length && !project.texts.length) {
+  for (const s of project.shapes || []) d = Math.max(d, s.end);
+  for (const e of project.effects || []) d = Math.max(d, e.end);
+  if (!d) {
     for (const a of project.audios) d = Math.max(d, a.start + (a.out - a.in));
   }
   return d;
@@ -242,5 +277,7 @@ export function normalizeProject(p) {
     return newAudio({ id: a.media, ...m }, a.start ?? 0, defined(a));
   });
   for (const t of proj.texts) delete t.label;
+  proj.shapes = (p.shapes || []).map((x) => newShape(x.start ?? 0, x.kind || 'round', defined(x)));
+  proj.effects = (p.effects || []).map((x) => newEffect(x.start ?? 0, x.type || 'flash', defined(x)));
   return proj;
 }

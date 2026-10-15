@@ -2,6 +2,7 @@
  * 1フレームを描画する。プレビューと書き出しで同じ関数を使うので、見た目が必ず一致する。
  */
 import { activeClipsAt, dipAt, mediaTime } from './project.js';
+import { applyEffects, drawShape, withMotion } from './fx.js';
 
 export const FONTS = {
   gothic: { family: '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif', weight: 900 },
@@ -52,10 +53,14 @@ export function drawFrame(ctx, project, layout, t, getSource, opts = {}) {
     ctx.globalAlpha = 1;
   }
 
+  const effects = project.effects || [];
+  applyEffects(ctx, W, H, effects, t, 'video');
+  for (const s of project.shapes || []) drawShape(ctx, W, H, s, t);
   for (const tx of project.texts) {
     if (tx.id === opts.hideTextId) continue;
     drawText(ctx, W, H, tx, t);
   }
+  applyEffects(ctx, W, H, effects, t, 'top');
   ctx.restore();
 }
 
@@ -134,8 +139,8 @@ function animState(tx, t) {
   const local = t - tx.start, remain = tx.end - t;
   const st = { alpha: 1, scale: 1, dy: 0, chars: Infinity };
   const IN = 0.3, OUT = 0.2;
+  if (tx.animOut ?? tx.anim !== 'none') { if (remain < OUT) st.alpha = Math.max(0, remain / OUT); }
   if (tx.anim === 'none') return st;
-  if (remain < OUT) st.alpha = Math.max(0, remain / OUT);
   const p = Math.min(1, local / IN);
   switch (tx.anim) {
     case 'fade': st.alpha *= p; break;
@@ -151,8 +156,9 @@ function animState(tx, t) {
   return st;
 }
 
-/** テキストのレイアウトを計算（描画とドラッグ判定の両方で使う） */
-export function measureText(ctx, W, H, tx) {
+/** テキストのレイアウトを計算（描画とドラッグ判定の両方で使う。t を渡すと動きも反映） */
+export function measureText(ctx, W, H, tx, t) {
+  if (t != null) tx = withMotion(tx, t);
   const font = FONTS[tx.font] || FONTS.gothic;
   const px = Math.max(8, tx.size * Math.min(W, H));
   ctx.font = `${font.weight} ${px}px ${font.family}`;
@@ -166,15 +172,18 @@ export function measureText(ctx, W, H, tx) {
   return { px, lh, lines, widths, cx, cy, box: { x: cx - bw / 2 - pad, y: cy - bh / 2 - pad, w: bw + pad * 2, h: bh + pad * 2 } };
 }
 
-export function drawText(ctx, W, H, tx, t) {
-  if (t < tx.start || t >= tx.end || !String(tx.text).trim()) return;
+export function drawText(ctx, W, H, tx0, t) {
+  if (t < tx0.start || t >= tx0.end || !String(tx0.text).trim()) return;
+  const tx = withMotion(tx0, t);
   const m = measureText(ctx, W, H, tx);
   const a = animState(tx, t);
-  if (a.alpha <= 0) return;
+  const alpha = a.alpha * (tx.opacity ?? 1);
+  if (alpha <= 0) return;
 
   ctx.save();
-  ctx.globalAlpha = a.alpha;
+  ctx.globalAlpha = alpha;
   ctx.translate(m.cx, m.cy + a.dy * m.px);
+  if (tx.rotation) ctx.rotate(tx.rotation * Math.PI / 180);
   ctx.scale(a.scale, a.scale);
   ctx.translate(-m.cx, -m.cy);
 

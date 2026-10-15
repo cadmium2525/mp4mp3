@@ -2,6 +2,7 @@
  * タイムライン。中央の再生ヘッドは固定で、下のトラックを横スクロールして位置を合わせる（スマホ向け）。
  */
 import { layoutClips, TRANSITIONS } from './engine/project.js';
+import { SHAPES, EFFECTS } from './engine/fx.js';
 
 const el = (tag, cls, attrs = {}) => {
   const e = document.createElement(tag);
@@ -16,6 +17,19 @@ const fmtShort = (s) => {
   return m ? `${m}:${String(Math.floor(ss)).padStart(2, '0')}` : `${Math.round(ss * 10) / 10}s`.replace('.0s', 's');
 };
 
+/** 時間が重なるものを段（レーン）に振り分ける */
+function assignLanes(items) {
+  const ends = [];
+  const lane = new Map();
+  for (const it of [...items].sort((a, b) => a.start - b.start)) {
+    let i = ends.findIndex((e) => e <= it.start + 1e-6);
+    if (i < 0) { i = ends.length; ends.push(0); }
+    ends[i] = it.end;
+    lane.set(it.id, i);
+  }
+  return { lane, count: Math.max(1, ends.length) };
+}
+
 const TR_ICON = { none: '＋', fade: '◐', black: '■', white: '□', slide: '⇢', wipe: '▥', zoom: '⤢' };
 
 export class Timeline {
@@ -29,6 +43,7 @@ export class Timeline {
     this.rows = {
       clip: root.querySelector('.tl-video'),
       text: root.querySelector('.tl-text'),
+      fx: root.querySelector('.tl-fx'),
       audio: root.querySelector('.tl-audio'),
     };
     this.expectScroll = null; // プログラムで動かしたスクロール位置（ユーザー操作と区別する）
@@ -134,23 +149,43 @@ export class Timeline {
       vrow.append(btn);
     });
 
-    // テキストトラック
+    // 文字・図形トラック（重なるものは段を分ける）
     const trow = this.rows.text;
     trow.textContent = '';
-    for (const tx of p.texts) {
-      const b = this.#block('text', tx.id, tx.start, tx.end - tx.start);
+    const overlays = [
+      ...p.texts.map((x) => ({ type: 'text', item: x, label: x.text.replace(/\n/g, ' ') || '（空）' })),
+      ...(p.shapes || []).map((x) => ({ type: 'shape', item: x, label: `◆ ${SHAPES[x.kind] || '図形'}` })),
+    ];
+    const ol = assignLanes(overlays.map((o) => o.item));
+    for (const o of overlays) {
+      const b = this.#block(o.type, o.item.id, o.item.start, o.item.end - o.item.start, ol.lane.get(o.item.id), ol.count);
       const lab = el('span', 'blabel');
-      lab.textContent = tx.text.replace(/\n/g, ' ') || '（空）';
+      lab.textContent = o.label;
       b.append(lab);
       trow.append(b);
+    }
+
+    // エフェクトトラック
+    const frow = this.rows.fx;
+    frow.textContent = '';
+    const effects = p.effects || [];
+    const fl = assignLanes(effects);
+    for (const e of effects) {
+      const b = this.#block('effect', e.id, e.start, e.end - e.start, fl.lane.get(e.id), fl.count);
+      const lab = el('span', 'blabel');
+      lab.textContent = `${EFFECTS[e.type]?.icon || ''} ${EFFECTS[e.type]?.label || e.type}`;
+      b.append(lab);
+      frow.append(b);
     }
 
     // 音声トラック
     const arow = this.rows.audio;
     arow.textContent = '';
+    const alen = (a) => (a.loop ? Math.max(0.1, dur - a.start) : Math.max(0.1, a.out - a.in));
+    const al = assignLanes(p.audios.map((a) => ({ id: a.id, start: a.start, end: a.start + alen(a) })));
     for (const a of p.audios) {
-      const len = a.loop ? Math.max(0, dur - a.start) : a.out - a.in;
-      const b = this.#block('audio', a.id, a.start, Math.max(0.1, len));
+      const len = alen(a);
+      const b = this.#block('audio', a.id, a.start, len, al.lane.get(a.id), al.count);
       const cv = el('canvas', 'wave');
       b.append(cv);
       const lab = el('span', 'blabel');
@@ -162,12 +197,17 @@ export class Timeline {
     this.#applySelection();
   }
 
-  #block(type, id, start, len) {
+  #block(type, id, start, len, lane = 0, lanes = 1) {
     const b = el('div', `blk ${type}`);
     b.dataset.type = type;
     b.dataset.id = id;
     b.style.left = `${this.pad + start * this.pps}px`;
     b.style.width = `${Math.max(6, len * this.pps)}px`;
+    if (lanes > 1) {
+      b.style.top = `calc(${(lane * 100) / lanes}% + ${lane ? 1 : 0}px)`;
+      b.style.height = `calc(${100 / lanes}% - 1px)`;
+      b.classList.add('thin');
+    }
     const hl = el('div', 'handle l');
     const hr = el('div', 'handle r');
     b.append(hl, hr);
