@@ -1,5 +1,5 @@
 /* オフラインでも使えるようにアプリ本体をキャッシュする */
-const CACHE = 'otodake-v4';
+const CACHE = 'otodake-v5';
 const ASSETS = [
   './',
   'index.html',

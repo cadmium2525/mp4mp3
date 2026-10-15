@@ -50,52 +50,17 @@
 
     <!-- 一括リネーム -->
     <details class="panel" id="renamePanel" hidden>
-      <summary><span>一括リネーム・並べ替え</span></summary>
+      <summary><span>まとめて名前をつける・並べ替え</span></summary>
       <div class="panel-body">
-        <div class="field">
-          <label for="rnTemplate">名前のパターン</label>
-          <input id="rnTemplate" type="text" value="{name}" autocomplete="off" autocapitalize="off" spellcheck="false">
-          <div class="chips">
-            <button type="button" class="chip" data-token="{name}">元の名前</button>
-            <button type="button" class="chip" data-token="{n}">連番</button>
-            <button type="button" class="chip" data-token="{date}">日付</button>
-            <button type="button" class="chip" data-token="{time}">時刻</button>
-            <button type="button" class="chip" data-token="_">_</button>
-          </div>
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label for="rnStart">連番の開始</label>
-            <input id="rnStart" type="number" inputmode="numeric" value="1" min="0">
-          </div>
-          <div class="field">
-            <label for="rnDigits">連番の桁数</label>
-            <select id="rnDigits">
-              <option value="1">1（1, 2, 3）</option>
-              <option value="2" selected>2（01, 02）</option>
-              <option value="3">3（001, 002）</option>
-            </select>
-          </div>
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label for="rnFind">置換：探す文字</label>
-            <input id="rnFind" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="例：RPReplay_">
-          </div>
-          <div class="field">
-            <label for="rnReplace">置き換える文字</label>
-            <input id="rnReplace" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="空なら削除">
-          </div>
-        </div>
-        <p class="hint">プレビュー</p>
-        <ul id="rnPreview" class="preview"></ul>
+        <p class="hint">上から順番に、つけたい名前を入れて「適用」を押してください。</p>
+        <ol id="rnList" class="rn-list"></ol>
         <div class="btn-row">
-          <button class="btn primary" id="rnApply" type="button">名前を適用</button>
+          <button class="btn primary" id="rnApply" type="button">適用</button>
           <button class="btn ghost" id="rnReset" type="button">元の名前に戻す</button>
         </div>
         <hr>
         <div class="field">
-          <label for="sortBy">並べ替え（連番・結合の順番に使われます）</label>
+          <label for="sortBy">並べ替え（曲目・結合の順番が変わります）</label>
           <div class="inline">
             <select id="sortBy">
               <option value="name">名前順</option>
@@ -302,8 +267,8 @@
         <p>音声はいったん端末のメモリに展開して処理します。iPhone では目安として1ファイル60分程度まで。止まる場合は「モノラル」にするか、ファイルを分けて試してください。変換中は画面を閉じたり、別のアプリに切り替えないでください。</p>
         <h3>「聞こえ方で統一」とは？</h3>
         <p>放送や音楽配信でも使われている ITU-R BS.1770（LUFS）という基準で、人が感じる音の大きさをそろえます。音を大きくして音割れしそうなところは自動で抑えます（リミッター）。</p>
-        <h3>日付・時刻の名前について</h3>
-        <p>{date}・{time} にはファイルの更新日時が入ります。写真ライブラリから選んだ場合、選んだ時刻になることがあります。</p>
+        
+        
         <p class="credits">MP3 エンコードに <a href="https://github.com/zhuker/lamejs" target="_blank" rel="noopener">lamejs</a>（LAME の JavaScript 移植, LGPL）を使用しています。</p>
       </div>
     </details>

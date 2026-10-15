@@ -75,6 +75,7 @@ function updateConditional() {
   }
   const ext = settings.format;
   for (const it of state.items) it.refs.ext.textContent = '.' + ext;
+  for (const el of $$('#rnList .ext')) el.textContent = '.' + ext;
   updateSettingsSummary();
   updateConvertButton();
 }
@@ -304,9 +305,9 @@ function buildCard(item) {
   refs.ext.textContent = '.' + settings.format;
   refs.kind.textContent = item.kind === 'video' ? '動画' : '音声';
 
-  refs.name.addEventListener('input', () => { item.name = refs.name.value; renderRenamePreview(); });
+  refs.name.addEventListener('input', () => { item.name = refs.name.value; syncRenameRow(item); });
   refs.name.addEventListener('blur', () => {
-    if (!refs.name.value.trim()) { item.name = item.original; refs.name.value = item.name; renderRenamePreview(); }
+    if (!refs.name.value.trim()) setName(item, item.original);
   });
   $('.remove', el).addEventListener('click', () => removeItem(item));
   $('.up', el).addEventListener('click', () => moveItem(item, -1));
@@ -447,7 +448,7 @@ function refreshList() {
   $('#actionbar').hidden = n === 0 && !state.busy;
   $('#count').textContent = n ? `${n}件` : '';
   updateConvertButton();
-  renderRenamePreview();
+  renderRenameList();
 }
 
 function updateConvertButton() {
@@ -558,78 +559,79 @@ function stopPreview() {
 }
 player.addEventListener('ended', stopPreview);
 
-/* ============ 一括リネーム ============ */
-
-const rn = {
-  template: $('#rnTemplate'),
-  start: $('#rnStart'),
-  digits: $('#rnDigits'),
-  find: $('#rnFind'),
-  replace: $('#rnReplace'),
-};
+/* ============ まとめて名前をつける ============ */
 
 function pad(n, d) { return String(n).padStart(d, '0'); }
 
-function computeNames() {
-  const tpl = rn.template.value || '{name}';
-  const start = Number(rn.start.value) || 0;
-  const digits = Number(rn.digits.value) || 1;
-  const find = rn.find.value;
-  const rep = rn.replace.value;
-  return state.items.map((it, i) => {
-    const d = new Date(it.file.lastModified || Date.now());
-    let name = tpl
-      .replaceAll('{name}', it.name)
-      .replaceAll('{n}', pad(start + i, digits))
-      .replaceAll('{date}', `${d.getFullYear()}${pad(d.getMonth() + 1, 2)}${pad(d.getDate(), 2)}`)
-      .replaceAll('{time}', `${pad(d.getHours(), 2)}${pad(d.getMinutes(), 2)}`);
-    if (find) name = name.replaceAll(find, rep);
-    return sanitize(name);
-  });
-}
+const rnList = $('#rnList');
 
-function renderRenamePreview() {
-  const ul = $('#rnPreview');
-  ul.textContent = '';
-  const names = computeNames();
+/** 「1曲目: [名前].mp3」の入力欄を一覧の順番で作り直す（入力途中の内容は item.draft に残る） */
+function renderRenameList() {
+  rnList.textContent = '';
   state.items.forEach((it, i) => {
     const li = document.createElement('li');
-    const a = document.createElement('span');
-    a.className = 'from';
-    a.textContent = it.name;
-    const arrow = document.createElement('span');
-    arrow.textContent = '→';
-    const b = document.createElement('span');
-    b.className = 'to' + (names[i] === it.name ? ' same' : '');
-    b.textContent = names[i];
-    li.append(a, arrow, b);
-    ul.append(li);
+    const no = document.createElement('label');
+    no.className = 'rn-no';
+    no.textContent = `${i + 1}曲目`;
+    const wrap = document.createElement('div');
+    wrap.className = 'name-wrap';
+    const input = document.createElement('input');
+    input.className = 'name';
+    input.type = 'text';
+    input.id = `rn-${it.id}`;
+    input.autocomplete = 'off';
+    input.autocapitalize = 'off';
+    input.spellcheck = false;
+    input.enterKeyHint = i === state.items.length - 1 ? 'done' : 'next';
+    input.value = it.draft ?? it.name;
+    input.addEventListener('input', () => { it.draft = input.value; });
+    // フォーカスしたら全選択して、そのまま打てば置き換わるようにする
+    input.addEventListener('focus', () => setTimeout(() => input.select(), 0));
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      const next = rnList.querySelectorAll('input')[i + 1];
+      if (next) next.focus(); else input.blur();
+    });
+    no.htmlFor = input.id;
+    const ext = document.createElement('span');
+    ext.className = 'ext';
+    ext.textContent = '.' + settings.format;
+    wrap.append(input, ext);
+    const orig = document.createElement('div');
+    orig.className = 'rn-orig';
+    orig.textContent = `元のファイル：${it.file.name}`;
+    li.append(no, wrap, orig);
+    rnList.append(li);
+    it.rnInput = input;
   });
 }
 
-for (const el of Object.values(rn)) el.addEventListener('input', renderRenamePreview);
-for (const chip of $$('.chip[data-token]')) {
-  chip.addEventListener('click', () => {
-    const t = rn.template;
-    const s = t.selectionStart ?? t.value.length, e = t.selectionEnd ?? t.value.length;
-    t.value = t.value.slice(0, s) + chip.dataset.token + t.value.slice(e);
-    t.focus();
-    t.setSelectionRange(s + chip.dataset.token.length, s + chip.dataset.token.length);
-    renderRenamePreview();
-  });
+/** カード側で名前を直接変えたときに、こちらの入力欄にも反映する */
+function syncRenameRow(item) {
+  item.draft = undefined;
+  if (item.rnInput) item.rnInput.value = item.name;
 }
+
+function setName(item, name) {
+  item.name = name;
+  item.draft = undefined;
+  item.refs.name.value = name;
+  if (item.rnInput) item.rnInput.value = name;
+}
+
 $('#rnApply').addEventListener('click', () => {
-  const names = computeNames();
-  state.items.forEach((it, i) => { it.name = names[i]; it.refs.name.value = names[i]; });
-  rn.template.value = '{name}';
-  rn.find.value = '';
-  rn.replace.value = '';
-  renderRenamePreview();
-  toast('名前を変更しました');
+  let changed = 0;
+  for (const it of state.items) {
+    const v = (it.draft ?? it.name).trim();
+    const name = v ? sanitize(v) : it.name;
+    if (name !== it.name) changed++;
+    setName(it, name);
+  }
+  toast(changed ? `${changed}件の名前を変更しました` : '名前は変わっていません');
 });
 $('#rnReset').addEventListener('click', () => {
-  for (const it of state.items) { it.name = it.original; it.refs.name.value = it.original; }
-  renderRenamePreview();
+  for (const it of state.items) setName(it, it.original);
   toast('元の名前に戻しました');
 });
 $('#sortApply').addEventListener('click', () => {
