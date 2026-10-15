@@ -165,46 +165,40 @@
           <p class="hint" data-show-if="normMode=lufs">人の耳の感じ方に近い「ラウドネス（LUFS）」をそろえます。複数ファイルの音量差をなくしたいときはこれ。</p>
           <p class="hint" data-show-if="normMode=peak">一番大きい音が指定の大きさになるように調整します。</p>
         </div>
-        <div class="row2" data-show-if="normMode=lufs">
-          <div class="field">
-            <label for="s-lufsTarget">目標の大きさ</label>
-            <select id="s-lufsTarget" name="lufsTarget" data-num>
-              <option value="-12">-12 LUFS（かなり大きい）</option>
-              <option value="-14">-14 LUFS（音楽配信サービス）</option>
-              <option value="-16">-16 LUFS（ポッドキャスト・おすすめ）</option>
-              <option value="-19">-19 LUFS（控えめ）</option>
-              <option value="-23">-23 LUFS（テレビ放送）</option>
-            </select>
+        <div class="field" data-show-if="normMode=lufs">
+          <label for="s-lufsTarget" class="range-label">目標の大きさ <output data-out="lufsTarget"></output></label>
+          <input type="range" id="s-lufsTarget" name="lufsTarget" min="-50" max="-8" step="1" data-num>
+          <div class="range-scale"><span>← 小さく</span><span>大きく →</span></div>
+          <div class="chips">
+            <button type="button" class="chip" data-set="lufsTarget=-14">-14 大きめ</button>
+            <button type="button" class="chip" data-set="lufsTarget=-16">-16 標準</button>
+            <button type="button" class="chip" data-set="lufsTarget=-23">-23 放送</button>
+            <button type="button" class="chip" data-set="lufsTarget=-30">-30 小さめ</button>
+            <button type="button" class="chip" data-set="lufsTarget=-40">-40 かなり小さい</button>
           </div>
-          <div class="field">
-            <label for="s-maxGain">最大で上げる量</label>
-            <select id="s-maxGain" name="maxGain" data-num>
-              <option value="6">+6 dB</option>
-              <option value="12">+12 dB</option>
-              <option value="20">+20 dB</option>
-              <option value="30">+30 dB</option>
-            </select>
+          <p class="hint">ゲームのBGMや効果音が大きすぎるときは、-24 くらいから少しずつ下げて、実際に鳴らしながらちょうどいい大きさを探してください。全ファイルが同じ聞こえ方の大きさにそろいます。</p>
+        </div>
+        <div class="field" data-show-if="normMode=peak">
+          <label for="s-peakTarget" class="range-label">最大音量 <output data-out="peakTarget"></output></label>
+          <input type="range" id="s-peakTarget" name="peakTarget" min="-40" max="0" step="1" data-num>
+          <div class="range-scale"><span>← 小さく</span><span>大きく →</span></div>
+          <div class="chips">
+            <button type="button" class="chip" data-set="peakTarget=-1">-1 標準</button>
+            <button type="button" class="chip" data-set="peakTarget=-6">-6</button>
+            <button type="button" class="chip" data-set="peakTarget=-12">-12</button>
+            <button type="button" class="chip" data-set="peakTarget=-20">-20</button>
+            <button type="button" class="chip" data-set="peakTarget=-30">-30</button>
           </div>
         </div>
-        <div class="row2" data-show-if="normMode=peak">
-          <div class="field">
-            <label for="s-peakTarget">最大音量</label>
-            <select id="s-peakTarget" name="peakTarget" data-num>
-              <option value="0">0 dB</option>
-              <option value="-1">-1 dB（おすすめ）</option>
-              <option value="-3">-3 dB</option>
-              <option value="-6">-6 dB</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="s-maxGain2">最大で上げる量</label>
-            <select id="s-maxGain2" name="maxGain" data-num>
-              <option value="6">+6 dB</option>
-              <option value="12">+12 dB</option>
-              <option value="20">+20 dB</option>
-              <option value="30">+30 dB</option>
-            </select>
-          </div>
+        <div class="field" data-hide-if="normMode=off">
+          <label for="s-maxGain">小さい音を上げるのは最大で</label>
+          <select id="s-maxGain" name="maxGain" data-num>
+            <option value="0">上げない（下げるだけ）</option>
+            <option value="6">+6 dB</option>
+            <option value="12">+12 dB</option>
+            <option value="20">+20 dB</option>
+            <option value="30">+30 dB</option>
+          </select>
         </div>
 
         <h3>編集</h3>

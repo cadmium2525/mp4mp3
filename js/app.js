@@ -55,6 +55,20 @@ function updateConditional() {
     const [k, v] = el.dataset.showIf.split('=');
     el.hidden = String(settings[k]) !== v;
   }
+  for (const out of $$('output[data-out]')) {
+    const k = out.dataset.out;
+    const v = settings[k];
+    out.textContent = k === 'lufsTarget' ? `${v} LUFS` : `${v} dB`;
+    if (k === 'lufsTarget') {
+      const small = document.createElement('small');
+      small.textContent = lufsWord(v);
+      out.append(small);
+    }
+  }
+  for (const chip of $$('.chip[data-set]')) {
+    const [k, v] = chip.dataset.set.split('=');
+    chip.classList.toggle('on', String(settings[k]) === v);
+  }
   for (const el of $$('[data-hide-if]')) {
     const [k, v] = el.dataset.hideIf.split('=');
     el.hidden = String(settings[k]) === v;
@@ -63,6 +77,15 @@ function updateConditional() {
   for (const it of state.items) it.refs.ext.textContent = '.' + ext;
   updateSettingsSummary();
   updateConvertButton();
+}
+
+function lufsWord(v) {
+  if (v >= -12) return 'とても大きい';
+  if (v >= -15) return '大きめ（音楽配信）';
+  if (v >= -18) return '標準（ポッドキャスト）';
+  if (v >= -24) return 'やや小さめ（テレビ放送）';
+  if (v >= -32) return '小さめ';
+  return 'かなり小さい';
 }
 
 function updateSettingsSummary() {
@@ -91,8 +114,18 @@ form.addEventListener('change', (e) => {
 });
 form.addEventListener('input', (e) => {
   const el = e.target;
-  if (el.type === 'text' && el.name in settings) { settings[el.name] = el.value; saveSettings(); }
+  if (!(el.name in settings)) return;
+  if (el.type === 'text') { settings[el.name] = el.value; saveSettings(); }
+  if (el.type === 'range') { settings[el.name] = Number(el.value); saveSettings(); updateConditional(); }
 });
+for (const chip of $$('.chip[data-set]')) {
+  chip.addEventListener('click', () => {
+    const [k, v] = chip.dataset.set.split('=');
+    settings[k] = Number(v);
+    saveSettings();
+    settingsToForm();
+  });
+}
 $('#resetSettings').addEventListener('click', () => {
   settings = { ...DEFAULTS };
   saveSettings();
@@ -768,6 +801,7 @@ function addResult(r) {
       if (st.capped) parts.push('※元が小さすぎるため上げ幅の上限で止めました');
     } else if (isFinite(st.lufsOut)) {
       parts.push(`音量 ${st.lufsOut.toFixed(1)} LUFS`);
+      if (st.capped) parts.push('※目標より小さいため上げていません');
     }
     for (const p of parts) { const s = document.createElement('span'); s.textContent = p; meta.append(s); }
     $('.share', el).addEventListener('click', () => shareFiles([r]));

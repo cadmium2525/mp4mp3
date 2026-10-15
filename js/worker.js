@@ -143,8 +143,8 @@ function applyLoudness(chs, sr, opts) {
   let gainDb = 0;
   if (opts.normMode === 'lufs' && isFinite(lufsIn)) gainDb = opts.lufsTarget - lufsIn;
   if (opts.normMode === 'peak' && peakIn > 0) gainDb = opts.peakTarget - toDb(peakIn);
+  stats.capped = gainDb > opts.maxGain + 0.05;
   gainDb = Math.max(-60, Math.min(opts.maxGain, gainDb));
-  stats.capped = gainDb >= opts.maxGain;
   stats.gainDb = gainDb;
 
   const g = Math.pow(10, gainDb / 20);
