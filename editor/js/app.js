@@ -156,6 +156,7 @@ class App {
     copy.media = Object.fromEntries(Object.entries(data.media).map(([k, v]) => [idMap[k] || k, { ...v, id: idMap[k] || k }]));
     for (const c of copy.clips) c.media = idMap[c.media] || c.media;
     for (const a of copy.audios) a.media = idMap[a.media] || a.media;
+    for (const o of copy.overlays || []) o.media = idMap[o.media] || o.media;
     await store.saveProject(copy, { ratio: ratioOf(copy) });
     this.closeSheet();
     this.showHome();
@@ -800,7 +801,8 @@ class App {
           b.classList.add('on');
           this.change(() => {
             const { label, ...rest } = st;
-            Object.assign(tx, rest, { style: key });
+            // 前のスタイルの装飾が残らないように、スタイルが決める項目をいったん消す
+            Object.assign(tx, { strokes: null, glow: null, extrude: null, bg: null, shadow: false }, rest, { style: key });
           });
         });
         grid.append(b);
@@ -1171,7 +1173,12 @@ class App {
     const reopen = () => { this.closeSheet(); this.openInspector(); };
     const cat = catalogSync();
     const e = cat?.byId[normRef(m.ref)];
-    if (!e) { loadCatalog().then(reopen).catch(() => toast('一覧を読み込めませんでした')); return; }
+    if (!e) {
+      if (cat) { toast(`Motion Prompt の #${normRef(m.ref)} はありません`); return; }
+      loadCatalog().then(() => { if (catalogSync()?.byId[normRef(m.ref)]) reopen(); else toast(`Motion Prompt の #${normRef(m.ref)} はありません`); })
+        .catch(() => toast('一覧を読み込めませんでした'));
+      return;
+    }
     const pack = cat.packs.find((p) => p.pack === e.pack);
     this.openSheet(`#${e.id} ${e.name.ja}`, (body) => {
       const cv = h('canvas', { width: '540', height: String(Math.round((540 * e.height) / e.width)) });
@@ -1551,6 +1558,7 @@ class App {
     if (missing.length) {
       project.clips = (project.clips || []).filter((c) => project.media[c.media]);
       project.audios = (project.audios || []).filter((a) => project.media[a.media]);
+      project.overlays = (project.overlays || []).filter((o) => project.media[o.media]);
       toast(`見つからなかった素材：${missing.join('、')}`, 5000);
     }
     const norm = normalizeProject(project);

@@ -30,7 +30,8 @@ function supportsFilter(ctx) {
 /* ---------- 切り抜きのキャッシュ（同じ時刻なら再計算しない） ---------- */
 
 const cutCache = new Map();
-function cutout(src, opt, key, mt, opts) {
+function cutout(src, opt, key0, mt, opts) {
+  const key = (opts.preview ? 'p:' : 'x:') + key0;
   const sig = JSON.stringify(opt);
   const c = cutCache.get(key);
   const now = performance.now();

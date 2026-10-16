@@ -1,5 +1,5 @@
 /* つなぐ：オフラインでも開けるようにアプリ本体をキャッシュ（ネット優先） */
-const CACHE = 'tsunagu-v4';
+const CACHE = 'tsunagu-v5';
 const ASSETS = [
   './', 'index.html', 'css/editor.css', 'manifest.webmanifest',
   'js/app.js', 'js/player.js', 'js/timeline.js', 'js/store.js',

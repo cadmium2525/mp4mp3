@@ -17,7 +17,8 @@ export const QUALITIES = {
 
 /** 出力解像度（長辺ではなく短辺で指定：1080 → 1080p） */
 export function outputSize(project, shortSide) {
-  const s = Math.min(1, shortSide / Math.min(project.width, project.height));
+  // 文字や図形はその解像度で描き直すので、元より大きく（最大 2 倍まで）書き出せる
+  const s = Math.min(2, shortSide / Math.min(project.width, project.height));
   const even = (v) => Math.max(2, Math.round(v / 2) * 2);
   return { width: even(project.width * s), height: even(project.height * s) };
 }
@@ -78,6 +79,7 @@ export async function exportVideo(project, lib, opts = {}) {
   }
   await output.start();
 
+  let readers = null;
   try {
     // 音声：使う素材をデコードしてミックス
     if (audioSource) {
@@ -112,7 +114,7 @@ export async function exportVideo(project, lib, opts = {}) {
         stamps.get(o.id).push(overlayTime(o, t));
       }
     }
-    const readers = new Map();
+    readers = new Map();
     for (const L of layout) {
       if (stamps.has(L.clip.id)) readers.set(L.clip.id, lib.frameReader(L.clip.media, stamps.get(L.clip.id), width, height));
     }
@@ -132,13 +134,14 @@ export async function exportVideo(project, lib, opts = {}) {
       await videoSource.add(t, 1 / fps);
       if (k % 5 === 0) onProgress(k / frames, `書き出し中… ${Math.round((k / frames) * 100)}%`);
     }
-    for (const r of readers.values()) r.close();
     videoSource.close();
     onProgress(1, '仕上げ中…');
     await output.finalize();
   } catch (err) {
     await output.cancel().catch(() => {});
     throw err;
+  } finally {
+    for (const r of readers?.values() || []) { try { r.close(); } catch { /* 済み */ } }
   }
 
   const blob = new Blob([output.target.buffer], { type: 'video/mp4' });

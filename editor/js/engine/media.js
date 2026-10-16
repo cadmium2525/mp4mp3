@@ -65,7 +65,12 @@ export class MediaLibrary {
     if (!kind) throw new Error('対応していないファイルです');
     const meta = { id, name: file.name, kind, duration: 0, width: 0, height: 0, hasAudio: false };
     const e = new Entry(meta, file);
-    await this.#probe(e);
+    try {
+      await this.#probe(e);
+    } catch (err) {
+      e.dispose();
+      throw err;
+    }
     this.entries.set(id, e);
     return meta;
   }
@@ -315,7 +320,10 @@ export class MediaLibrary {
   /** 書き出し用のフレーム取得器（クリップごとに作る） */
   frameReader(id, timestamps, width, height) {
     const e = this.get(id);
+    // 素材が見つからない（端末から消えた等）ときは何も描かない
+    if (!e) return { next: async () => null, close() {} };
     if (e.meta.kind === 'image') {
+      if (!e.bitmap) return { next: async () => null, close() {} };
       const src = { image: e.bitmap, width: e.bitmap.width, height: e.bitmap.height };
       return { next: async () => src, close() {} };
     }
