@@ -565,8 +565,12 @@ function warnings(r, opts) {
     const miss = [];
     opts.expectChords.forEach((c, i) => {
       if (!c || !r.chords[i]) return;
-      const root = (s) => s.replace(/^([A-G][#b]?).*$/, '$1');
-      if (root(c) !== root(r.chords[i])) miss.push(`${i + 1}小節目：予定 ${c} → 検出 ${r.chords[i]}`);
+      // 異名同音（Bb = A#）をそろえ、分数コードの低音が予定のルートなら一致とみなす
+      const FL = { Db: 'C#', Eb: 'D#', Gb: 'F#', Ab: 'G#', Bb: 'A#', Cb: 'B', Fb: 'E', 'E#': 'F', 'B#': 'C' };
+      const root = (x) => { const m = /^([A-G][#b]?)/.exec(x); return m ? FL[m[1]] || m[1] : x; };
+      const bass = (x) => (x.includes('/') ? root(x.split('/')[1]) : null);
+      const det = r.chords[i];
+      if (root(c) !== root(det) && root(c) !== bass(det)) miss.push(`${i + 1}小節目：予定 ${c} → 検出 ${det}`);
     });
     if (miss.length) w.push(`和音の検出結果が予定と違う小節：${miss.slice(0, 6).join(' / ')}`);
   }

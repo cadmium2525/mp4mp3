@@ -13,6 +13,8 @@ node daw/tools/analyze.mjs 参考曲.mp3 --sheet ref.png        # 手元の音�
 node daw/tools/audition.mjs inst|sfx 一覧.png                 # プリセットの総点検
 ```
 
+例：`examples/japan2070_bgm.json`（ドキュメンタリー動画の BGM。10 トラック・7 つの場面に合わせた構成。`*.gen.mjs` はそれを作るスクリプト）。
+
 ## 時間の単位
 
 曲の中の時間は **拍**（4 分音符 = 1）。4/4 拍子なら 1 小節 = 4 拍、`at: 16` は 5 小節目の頭。
