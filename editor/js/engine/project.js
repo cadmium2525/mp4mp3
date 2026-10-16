@@ -43,6 +43,7 @@ export function newProject(preset = 'shorts') {
     texts: [],
     audios: [],
     overlays: [],
+    motions: [],
     shapes: [],
     effects: [],
     updatedAt: Date.now(),
@@ -105,6 +106,36 @@ export function newOverlay(media, start = 0, opts = {}) {
     keys: null,
     ease: 'ease',
     cutout: null,
+    ...opts,
+  };
+}
+
+/** Motion Prompt の要素（#001〜）を画面に置く */
+export function newMotion(ref, start = 0, cycle = 4.7, opts = {}) {
+  return {
+    id: uid('mo'),
+    ref: String(ref).replace(/^#/, '').padStart(3, '0'),
+    start,
+    end: start + cycle,
+    x: 0.5,
+    y: 0.5,
+    w: 1,
+    cover: false,
+    mode: 'loop',
+    hold: null,
+    speed: 1,
+    offset: 0,
+    transparent: false,
+    colors: null,
+    opacity: 1,
+    rotation: 0,
+    scale: 1,
+    rx: 0,
+    ry: 0,
+    anim: 'none',
+    loop: 'none',
+    keys: null,
+    ease: 'ease',
     ...opts,
   };
 }
@@ -220,6 +251,7 @@ export function projectDuration(project, layout = layoutClips(project)) {
   for (const t of project.texts) d = Math.max(d, t.end);
   for (const s of project.shapes || []) d = Math.max(d, s.end);
   for (const o of project.overlays || []) d = Math.max(d, overlayEnd(o));
+  for (const m of project.motions || []) d = Math.max(d, m.end);
   for (const e of project.effects || []) d = Math.max(d, e.end);
   if (!d) {
     for (const a of project.audios) d = Math.max(d, a.start + (a.out - a.in));
@@ -332,6 +364,7 @@ export function normalizeProject(p) {
   for (const t of proj.texts) delete t.label;
   proj.shapes = (p.shapes || []).map((x) => newShape(x.start ?? 0, x.kind || 'round', defined(x)));
   proj.effects = (p.effects || []).map((x) => newEffect(x.start ?? 0, x.type || 'flash', defined(x)));
+  proj.motions = (p.motions || []).map((m) => newMotion(m.ref ?? '001', m.start ?? 0, 4.7, defined(m)));
   proj.overlays = (p.overlays || []).map((o) => {
     const m = proj.media[o.media] || { id: o.media, kind: 'video', duration: o.out ?? 3 };
     return newOverlay({ id: o.media, ...m }, o.start ?? 0, defined(o));

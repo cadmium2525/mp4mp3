@@ -19,6 +19,7 @@
   "media":  { "<id>": Media, ... },
   "clips":  [ Clip, ... ],          // メイントラック。上から順に隙間なくつながる
   "overlays":[ Overlay, ... ],      // 画面に重ねる動画・写真（ワイプ / PiP / 切り抜き）
+  "motions": [ Motion, ... ],       // Motion Prompt の要素（#001〜#120 の名前つきの動き）
   "texts":  [ Text, ... ],          // テロップ・字幕。時刻で自由に配置
   "shapes": [ Shape, ... ],         // 図形（四角・丸・矢印・吹き出し…）
   "effects":[ Effect, ... ],        // エフェクト（ぼかし・手ぶれ・紙吹雪…）
@@ -26,8 +27,8 @@
 }
 ```
 
-描画の重なり順は 下から「映像 → 映像系エフェクト → 重ねた映像 → 図形 → テキスト → 上乗せ系エフェクト」。
-`overlays` / `shapes` / `texts` は配列の後ろのものほど手前に描かれます。
+描画の重なり順は 下から「映像 → 映像系エフェクト → 重ねた映像 → Motion Prompt の要素 → 図形 → テキスト → 上乗せ系エフェクト」。
+`overlays` / `motions` / `shapes` / `texts` は配列の後ろのものほど手前に描かれます。
 
 `clips` が空でも、図形・テキスト・エフェクトだけで動画を作れます（長さは一番遅く終わるものまで）。
 
@@ -138,6 +139,43 @@
 | `anim` / `loop` | `pop` / `none` | 出かた・続く動き（図形と同じ） |
 | `keys` / `to` / `ease` | なし | 動き |
 | `cutout` | なし | 切り抜き（下を参照） |
+
+## Motion（Motion Prompt の要素）
+
+[Motion Prompt](https://github.com/showheyohtaki/motion-prompt)（MIT License © 2026 Shohei Ohtaki）の 120 個の「名前つきの動き」を、
+番号を書くだけでそのまま使えます（コードは `editor/lib/motion-prompt/` に同梱）。
+各要素は「時刻 u だけで絵が決まる Canvas 2D の関数」なので、見本と同じ動き・同じタイミングで描かれます。
+
+| 番号 | パック | 内容 |
+| --- | --- | --- |
+| #001–024 | `motion` | モーショングラフィックスの動き（ポップイン、タイプライター、カウントアップ、モーフィング、グリッチ…） |
+| #025–048 | `camera` | カメラワークと切り替え（ドリー、オービット、ホイップパン、スマッシュカット…） |
+| #049–072 | `ui` | UI パーツ（トースト、モーダル、スケルトン…） |
+| #073–096 | `lp` | LP・Web サイトの演出（パララックス、スクロール連動…） |
+| #097–120 | `photo` | 写真の表現・光と画風（ゴールデンアワー、ボケ…） |
+
+```jsonc
+{ "ref": "007", "start": 1, "end": 5, "y": 0.4, "w": 0.9, "mode": "hold", "hold": 2.5, "transparent": true }
+```
+
+| キー | 既定値 | 説明 |
+| --- | --- | --- |
+| `ref` | — | 要素の番号（`"012"`、`"#012"`、`12` どれでも） |
+| `start` / `end` | — | 表示する時刻（動画全体の中での秒） |
+| `mode` | `loop` | `loop` くり返す / `once` 1周だけ（最後の絵で止まる） / `hold` 要素の中の `hold` 秒で止める / `still` `hold` 秒の静止画 |
+| `hold` | 1周の半分 | `hold` / `still` で止める位置（**要素の中の秒**）。登場が終わって落ち着いた瞬間を選ぶ（仕様の時間から読む） |
+| `speed` | 1 | 速さ（2 で倍速） |
+| `offset` | 0 | 要素の中のどこから始めるか（秒） |
+| `x` / `y` / `w` | 0.5 / 0.5 / 1 | 中心の位置、カードの幅（**画面の幅**に対する割合。カードは横長 539×208） |
+| `cover` | false | true でカードを画面いっぱいに広げる（はみ出しは切れる） |
+| `transparent` | false | true でカードの背景（全面の塗り）を描かず、下の映像を見せる |
+| `colors` | なし | パレットの差し替え `{ "navy": "#000000", "blue": "#ff4f8b" }`（キーはパックごと。一部の色だけ変わる要素もある） |
+| `opacity` / `rotation` / `scale` / `rx` / `ry` | | 不透明度・回転・拡大率・3D |
+| `anim` / `keys` / `ease` | `none` / なし | 出かた・キーフレーム（ほかの要素と同じ） |
+
+- 要素の中の文字・数字はサンプルです。言葉を変えたいときは、透明にした要素の上に `texts` を重ねてください。
+- 一覧・仕様は `node editor/tools/motion-catalog.mjs list | search 言葉 | get 番号`（仕様・1周の秒数・パレットのキーが出る）。
+- 見本：`https://showheyohtaki.github.io/motion-prompt/#番号`
 
 ## 切り抜き（cutout）
 
@@ -258,7 +296,7 @@ Text・Shape・Overlay は **キーフレーム** `keys` で自由に動かせ�
 2. 「…」→「JSONをコピー」と「コマ一覧の画像」を Claude に送る
    - JSON：素材名・長さ・今の編集内容・無音区間
    - コマ一覧：素材を数秒おきに並べた時刻つきの画像（映像の中身が伝わる）
-3. 「無音をカットしてテンポよく」「この内容でテロップを付けて」「最後に紙吹雪」などと頼む
+3. 「無音をカットしてテンポよく」「この内容でテロップを付けて」「最後に紙吹雪」「冒頭を Motion Prompt の #005 に」などと頼む
 4. 返ってきた JSON を「JSONを貼り付け」で反映 → 確認・微調整 → 書き出し
 
 ## コマンドで書き出す（PC・Claude 向け）
@@ -267,6 +305,7 @@ Text・Shape・Overlay は **キーフレーム** `keys` で自由に動かせ�
 
 ```sh
 node editor/tools/validate.mjs project.json                                # JSON のチェック（書き間違いを日本語で指摘）
+node editor/tools/motion-catalog.mjs search 文字 登場                        # Motion Prompt の要素を探す（get 番号 で仕様）
 node editor/tools/render.mjs project.json 素材フォルダ out.mp4            # 動画
 node editor/tools/render.mjs project.json 素材フォルダ still.png --still 3 # 3秒地点の静止画（構図の確認）
 node editor/tools/render.mjs project.json 素材フォルダ sheet.png --sheet 16 # 全体を16コマに分けた一覧（動きの確認）

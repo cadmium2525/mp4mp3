@@ -6,6 +6,7 @@ import { activeClipsAt, dipAt, mediaTime, overlayEnd } from './project.js';
 import { applyEffects, drawShape, shapeBox, shapeAnim, withMotion, paint } from './fx.js';
 import { applyCutout } from './cutout.js';
 import { draw3D, layerCanvas } from './warp3d.js';
+import { drawMotionElement, motionBox, element as motionElement } from './motionlib.js';
 
 export const FONTS = {
   gothic: { family: '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif', weight: 900 },
@@ -85,6 +86,7 @@ export function drawFrame(ctx, project, layout, t, getSource, opts = {}) {
   const effects = project.effects || [];
   applyEffects(ctx, W, H, effects, t, 'video');
   for (const o of project.overlays || []) drawOverlay(ctx, W, H, o, t, getSource, opts);
+  for (const m of project.motions || []) drawMotion(ctx, W, H, m, t);
   for (const s of project.shapes || []) with3D(ctx, W, H, s, t, (c) => drawShape(c, W, H, s, t), () => shapeBox(W, H, s, t));
   for (const tx of project.texts) {
     if (tx.id === opts.hideTextId) continue;
@@ -247,6 +249,34 @@ function drawOverlay(ctx, W, H, ov0, t, getSource, opts) {
     const r = Math.hypot(dw, dh) / 2 * Math.max(1, a.scale) * 1.2 + base * 0.05;
     draw3D(ctx, target.canvas, { x: cx - r, y: cy - r, w: r * 2, h: r * 2 }, cx, cy, { rx: ov.rx, ry: ov.ry, perspective: ov.perspective, backface: true }, W, H);
   }
+}
+
+/* ---------- Motion Prompt の要素 ---------- */
+
+function drawMotion(ctx, W, H, m0, t) {
+  if (t < m0.start || t >= m0.end) return;
+  const m = withMotion(m0, t);
+  const a = shapeAnim(m, t);
+  const alpha = (m.opacity ?? 1) * a.alpha;
+  if (alpha <= 0) return;
+  const el = motionElement(m.ref);
+  if (!el) return;
+  const b0 = motionBox(W, H, m, el.cw, el.ch);
+  const mm = { ...m, scale: (m.scale ?? 1) * a.scale, rotation: (m.rotation || 0) + a.rot, y: (m.cover ? 0.5 : m.y ?? 0.5) + (a.dy * b0.dh) / H };
+  // 要素は合成モードなども使うので、専用の下書きに描いてから重ねる
+  const { canvas, ctx: lc } = layerCanvas('mp', W, H);
+  if (!drawMotionElement(lc, W, H, mm, t)) return;
+  const b = motionBox(W, H, mm, el.cw, el.ch);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (a.reveal < 1) { ctx.beginPath(); ctx.rect(b.box.x, 0, b.box.w * a.reveal, H); ctx.clip(); }
+  if (m.rx || m.ry) {
+    const r = Math.hypot(b.dw, b.dh) / 2 * 1.05;
+    draw3D(ctx, canvas, { x: b.cx - r, y: b.cy - r, w: r * 2, h: r * 2 }, b.cx, b.cy, { rx: m.rx, ry: m.ry, perspective: m.perspective, backface: true }, W, H);
+  } else {
+    ctx.drawImage(canvas, 0, 0);
+  }
+  ctx.restore();
 }
 
 /* ---------- テキスト ---------- */

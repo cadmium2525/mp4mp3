@@ -1,5 +1,5 @@
 import {
-  PRESETS, TRANSITIONS, TEXT_STYLES, newProject, newClip, newText, newAudio, newShape, newEffect, newOverlay, overlayEnd, uid,
+  PRESETS, TRANSITIONS, TEXT_STYLES, newProject, newClip, newText, newAudio, newShape, newEffect, newOverlay, newMotion, overlayEnd, uid,
   layoutClips, mediaTime, normalizeProject, usedMediaIds,
 } from './engine/project.js';
 import { MediaLibrary } from './engine/media.js';
@@ -8,6 +8,7 @@ import { drawText, measureText, loadFonts, overlayBox } from './engine/render.js
 import { SHAPES, EFFECTS, drawShape, shapeBox, withMotion, keyStates, itemEnd, ANIM_PROPS, GRADIENTS } from './engine/fx.js';
 import { loadCutout, cutoutReady } from './engine/cutout.js';
 import { validateProject } from './engine/validate.js';
+import { loadCatalog, catalogSync, loadPack, drawMotionElement, motionBox, normRef, element as motionElement } from './engine/motionlib.js';
 import { Player } from './player.js';
 import { Timeline } from './timeline.js';
 import * as store from './store.js';
@@ -55,6 +56,7 @@ const ICONS = {
   front: '<rect x="4" y="4" width="11" height="11" rx="1.5"/><path d="M9 20h11V9"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/>',
   pip: '<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1"/>',
+  mp: '<path d="M4 17c3-9 6 4 9-4s5-3 7-5"/><circle cx="20" cy="8" r="1.5"/><path d="M4 21h16"/>',
   cut: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 8L20 19M8.5 16L20 5"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24">${ICONS[name]}</svg>`;
@@ -73,6 +75,8 @@ class App {
       onState: (on) => document.body.classList.toggle('playing', on),
     });
     this.player.onAudioReady = () => this.timeline?.render();
+    // Motion Prompt の一覧やパックを読み込み終えたら、タイムラインの名前を出し直す
+    window.addEventListener('motionready', () => this.timeline?.render());
     this.timeline = new Timeline($('#timeline'), this);
     this.#bind();
     this.showHome();
@@ -316,7 +320,7 @@ class App {
 
   listOf(type) {
     const p = this.project;
-    return { clip: p.clips, text: p.texts, audio: p.audios, shape: p.shapes, effect: p.effects, overlay: p.overlays }[type];
+    return { clip: p.clips, text: p.texts, audio: p.audios, shape: p.shapes, effect: p.effects, overlay: p.overlays, motion: p.motions }[type];
   }
 
   findItem(type, id) {
@@ -380,13 +384,15 @@ class App {
     const p = this.project;
     const t = this.player.t;
     const sel = this.timeline.selection;
-    if (sel && ['text', 'shape', 'effect'].includes(sel.type)) {
+    if (sel && ['text', 'shape', 'effect', 'motion'].includes(sel.type)) {
       const tx = this.findItem(sel.type, sel.id);
       const list = this.listOf(sel.type);
       if (t <= tx.start + 0.1 || t >= tx.end - 0.1) return toast('途中に再生ヘッドを合わせてください');
       return this.change(() => {
         const b = { ...JSON.parse(JSON.stringify(tx)), id: uid(sel.type[0]), start: t };
         splitMotion(tx, b, t);
+        // Motion Prompt の要素は、分割した後半も動きの続きから再生する
+        if (sel.type === 'motion') b.offset = (tx.offset || 0) + (t - tx.start) * (tx.speed || 1);
         if ('anim' in tx) {
           // 前半は消えずに、後半は出現アニメなしでつなぐ
           b.animOut = tx.animOut ?? tx.anim !== 'none';
@@ -462,7 +468,7 @@ class App {
     copy.id = uid(sel.type[0]);
     this.change(() => {
       if (sel.type === 'clip') p.clips.splice(p.clips.indexOf(item) + 1, 0, copy);
-      if (['text', 'shape', 'effect'].includes(sel.type)) {
+      if (['text', 'shape', 'effect', 'motion'].includes(sel.type)) {
         const d = item.end - item.start;
         copy.start = item.end;
         copy.end = item.end + d;
@@ -500,7 +506,7 @@ class App {
       } else if (mode === 'right') {
         item.out = Math.max(item.in + 0.2, Math.min(maxOut, orig.out + dt * sp));
       }
-    } else if (type === 'text' || type === 'shape' || type === 'effect') {
+    } else if (type === 'text' || type === 'shape' || type === 'effect' || type === 'motion') {
       const snap = (v) => (Math.abs(v - this.player.t) * this.timeline.pps < 10 ? this.player.t : v);
       if (mode === 'left') item.start = Math.max(0, Math.min(orig.end - 0.2, snap(orig.start + dt)));
       if (mode === 'right') item.end = Math.max(orig.start + 0.2, snap(orig.end + dt));
@@ -556,6 +562,7 @@ class App {
     if (!sel) {
       tool('media', '素材を追加', () => this.addMediaDialog());
       tool('text', 'テキスト', () => this.addText());
+      tool('mp', 'モーション', () => this.addMotionDialog());
       tool('pip', 'ワイプ', () => $('#fileOverlay').click());
       tool('shape', '図形', () => this.addShapeDialog());
       tool('fx', 'エフェクト', () => this.addEffectDialog());
@@ -587,6 +594,12 @@ class App {
     } else if (sel.type === 'overlay') {
       tool('edit', '編集', () => this.openInspector());
       tool('cut', '切り抜き', () => this.openInspector('cutout'));
+      tool('split', '分割', () => this.splitAtPlayhead());
+      tool('dup', '複製', () => this.duplicateSelected());
+      tool('front', '最前面へ', () => this.bringToFront());
+      tool('del', '削除', () => this.deleteSelected(), 'danger');
+    } else if (sel.type === 'motion') {
+      tool('edit', '編集', () => this.openInspector());
       tool('split', '分割', () => this.splitAtPlayhead());
       tool('dup', '複製', () => this.duplicateSelected());
       tool('front', '最前面へ', () => this.bringToFront());
@@ -709,6 +722,7 @@ class App {
     if (sel.type === 'shape') this.#shapeSheet(item);
     if (sel.type === 'effect') this.#effectSheet(item);
     if (sel.type === 'overlay') this.#overlaySheet(item, section);
+    if (sel.type === 'motion') this.#motionSheet(item);
   }
 
   #clipSheet(c, section) {
@@ -1079,6 +1093,145 @@ class App {
     if (cutoutReady(kind)) return;
     toast('切り抜き AI を準備中…（初回のみ）', 8000);
     loadCutout(kind).then(() => toast('切り抜き AI の準備ができました')).catch((err) => toast('AI を読み込めませんでした：' + err.message, 5000));
+  }
+
+  /* ---- Motion Prompt ---- */
+
+  /** カードに要素を描く（ギャラリーの見本用） */
+  #drawCard(cv, ref, u) {
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    drawMotionElement(ctx, cv.width, cv.height, { ref, start: 0, end: 1e9, mode: 'still', hold: u, x: 0.5, y: 0.5, w: 1 }, 0);
+  }
+
+  /** 見本を動かす（シートが開いている間だけ、画面に見えているものだけ） */
+  #animateCards(cards) {
+    const visible = new Set();
+    const io = new IntersectionObserver((es) => { for (const e of es) e.isIntersecting ? visible.add(e.target) : visible.delete(e.target); });
+    for (const c of cards) io.observe(c.cv);
+    const t0 = performance.now();
+    let last = 0, raf = 0;
+    const loop = (now) => {
+      if ($('#sheet').hidden || !cards[0]?.cv.isConnected) { io.disconnect(); return; }
+      if (now - last > 40) {
+        last = now;
+        const t = (now - t0) / 1000;
+        for (const c of cards) if (visible.has(c.cv)) this.#drawCard(c.cv, c.ref, t % c.cycle);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); io.disconnect(); };
+  }
+
+  async addMotionDialog(packName) {
+    let cat;
+    try { cat = await loadCatalog(); } catch { return toast('Motion Prompt の一覧を読み込めませんでした'); }
+    const pk = packName || this.mpPack || 'motion';
+    this.mpPack = pk;
+    this.openSheet('モーション素材（Motion Prompt）', (body) => {
+      const tabs = h('div', { class: 'seg mp-tabs' });
+      for (const p of cat.packs) {
+        const b = h('button', { type: 'button', class: p.pack === pk ? 'on' : '' }, p.title.ja);
+        b.onclick = () => { this.closeSheet(); this.addMotionDialog(p.pack); };
+        tabs.append(b);
+      }
+      const pack = cat.packs.find((p) => p.pack === pk);
+      body.append(tabs, h('p', { class: 'note' }, '動く見本をタップすると、再生ヘッドの位置に追加されます。各要素の文字や数字はサンプルなので、差し替えたい言葉はテキストを重ねてください。'));
+      const cards = [];
+      for (const c of pack.categories) {
+        const grid = h('div', { class: 'mp-grid' });
+        for (const e of cat.elements.filter((x) => x.pack === pk && x.category === c.slug)) {
+          const cv = h('canvas', { width: '270', height: String(Math.round((270 * e.height) / e.width)) });
+          const card = h('button', { type: 'button', class: 'mp-card', 'aria-label': e.name.ja }, cv, h('b', {}, `#${e.id} ${e.name.ja}`), h('small', {}, e.meaning.ja));
+          card.onclick = () => this.#insertMotion(e);
+          grid.append(card);
+          cards.push({ cv, ref: e.id, cycle: e.cycle });
+        }
+        body.append(h('div', { class: 'sec' }, h('div', { class: 'lbl' }, h('span', {}, c.ja)), grid));
+      }
+      body.append(h('p', { class: 'note' }, `出典：Motion Prompt（MIT License © 2026 Shohei Ohtaki）${cat.repo}`));
+      loadPack(pk).then(() => { this.onSheetClose = this.#animateCards(cards); }).catch((err) => toast(err.message));
+    }, { tall: true });
+  }
+
+  #insertMotion(e) {
+    const p = this.project;
+    const t = Math.min(this.player.t, Math.max(0, this.player.duration - 0.5));
+    const m = newMotion(e.id, t, Math.max(3, e.cycle));
+    this.closeSheet();
+    this.change(() => p.motions.push(m));
+    this.select({ type: 'motion', id: m.id });
+    this.player.seek(t + 0.05);
+    this.openInspector();
+  }
+
+  #motionSheet(m) {
+    const reopen = () => { this.closeSheet(); this.openInspector(); };
+    const cat = catalogSync();
+    const e = cat?.byId[normRef(m.ref)];
+    if (!e) { loadCatalog().then(reopen).catch(() => toast('一覧を読み込めませんでした')); return; }
+    const pack = cat.packs.find((p) => p.pack === e.pack);
+    this.openSheet(`#${e.id} ${e.name.ja}`, (body) => {
+      const cv = h('canvas', { width: '540', height: String(Math.round((540 * e.height) / e.width)) });
+      const stop = this.#animateCards([{ cv, ref: e.id, cycle: e.cycle }]);
+      this.onSheetClose = stop;
+      const holdOn = m.mode === 'hold' || m.mode === 'still';
+      body.append(
+        h('div', { class: 'mp-head' }, cv),
+        h('p', {}, `${e.name.en} — ${e.meaning.ja}`),
+        h('details', {}, h('summary', { class: 'note' }, '動きの仕様（Motion Prompt）'),
+          h('ul', { class: 'mp-spec' }, ...e.spec.ja.map((s) => h('li', {}, s))),
+          h('p', { class: 'note' }, `使いどころ：${e.use.ja}`),
+          h('a', { class: 'note', href: `${cat.site}#${e.id}`, target: '_blank', rel: 'noopener' }, '見本ページを開く')),
+        this.seg('再生のしかた', [['loop', 'くり返す'], ['once', '1回だけ'], ['hold', '途中で止める'], ['still', '静止画']], m.mode || 'loop', (v) => {
+          m.mode = v;
+          if ((v === 'hold' || v === 'still') && m.hold == null) m.hold = Math.round(e.cycle * 0.5 * 100) / 100;
+          setTimeout(reopen);
+        }),
+        holdOn ? this.slider(m.mode === 'still' ? '見せる瞬間' : '止める位置', m.hold ?? e.cycle / 2, 0, e.cycle - 0.01, 0.01, (v) => `${v.toFixed(2)}秒`, (v) => {
+          m.hold = v;
+          if (m.mode === 'hold') this.player.seek(Math.min(m.end - 0.01, m.start + Math.max(0, v - (m.offset || 0)) / (m.speed || 1)));
+        }) : null,
+        this.slider('速さ', m.speed ?? 1, 0.25, 3, 0.05, (v) => `${v.toFixed(2)}x`, (v) => { m.speed = v; }),
+        this.slider('始める位置（要素の中の秒）', m.offset || 0, 0, e.cycle - 0.01, 0.01, (v) => `${v.toFixed(2)}秒`, (v) => { m.offset = v; }),
+        this.toggle('画面いっぱいに広げる', m.cover, (v) => { m.cover = v; }),
+        m.cover ? null : this.slider('大きさ（画面の幅に対して）', this.cur(m).w ?? 1, 0.15, 2.5, 0.01, (v) => `${Math.round(v * 100)}%`, (v) => { this.kfTarget(m).w = v; }),
+        this.toggle('背景を透明にする（下の映像を見せる）', m.transparent, (v) => { m.transparent = v; }),
+        Object.keys(pack.palette || {}).length ? this.#paletteEditor(m, pack.palette) : null,
+        this.slider('不透明度', this.cur(m).opacity ?? 1, 0.05, 1, 0.01, (v) => `${Math.round(v * 100)}%`, (v) => { this.kfTarget(m).opacity = v; }),
+        this.slider('回転', this.cur(m).rotation || 0, -180, 180, 1, (v) => `${Math.round(v)}°`, (v) => { this.kfTarget(m).rotation = v; }),
+        ...this.#threeDSection(m),
+        this.seg('出かた', [['none', 'なし'], ['fade', 'フェード'], ['pop', 'ポップ'], ['slide', 'スライド'], ['wipe', 'ワイプ']], m.anim || 'none', (v) => { m.anim = v; }),
+        ...this.#keySection(m, reopen),
+        this.#timingButtons(m, reopen),
+        h('p', { class: 'note' }, 'プレビューでドラッグして位置を動かせます。文字や数字はサンプルのままなので、言葉を変えたいときはテキストを重ねてください。'),
+        h('p', { class: 'note' }, `Motion Prompt #${e.id}（MIT License © 2026 Shohei Ohtaki）`),
+      );
+      this.#seekInto(m);
+    });
+  }
+
+  /** パレット（色の役割ごと）の差し替え */
+  #paletteEditor(m, defaults) {
+    const row = h('div', { class: 'pal-row' });
+    for (const [k, def] of Object.entries(defaults)) {
+      const input = h('input', { type: 'color', 'aria-label': k });
+      input.value = m.colors?.[k] || def;
+      input.addEventListener('input', () => {
+        this.beginEdit();
+        m.colors = { ...(m.colors || {}), [k]: input.value };
+        this.live();
+      });
+      input.addEventListener('change', () => this.endEdit());
+      row.append(h('label', {}, input, k));
+    }
+    return h('div', { class: 'sec' },
+      h('div', { class: 'lbl' }, h('span', {}, '色の差し替え（パレット）'),
+        h('button', { class: 'txt-btn', type: 'button', onclick: () => { this.change(() => { m.colors = null; }); this.closeSheet(); this.openInspector(); } }, '元に戻す')),
+      row,
+      h('p', { class: 'note' }, '要素によっては、一部の色だけが変わります。'));
   }
 
   /* ---- ワイプ（重ねた映像） ---- */
@@ -1536,9 +1689,11 @@ class App {
       const cands = [
         ...[...this.project.texts].reverse().map((x) => ({ type: 'text', item: x })),
         ...[...this.project.shapes].reverse().map((x) => ({ type: 'shape', item: x })),
+        ...[...this.project.motions].reverse().map((x) => ({ type: 'motion', item: x })),
         ...[...this.project.overlays].reverse().map((x) => ({ type: 'overlay', item: x })),
       ].filter(({ type, item }) => t >= item.start && t < itemEnd(item) &&
-        inside(type === 'text' ? measureText(ctx, W, H, item, t).box : type === 'shape' ? shapeBox(W, H, item, t).box : this.#overlayBox(W, H, item, t).box));
+        inside(type === 'text' ? measureText(ctx, W, H, item, t).box : type === 'shape' ? shapeBox(W, H, item, t).box
+          : type === 'motion' ? this.#motionBox(W, H, item, t).box : this.#overlayBox(W, H, item, t).box));
       const hit = cands.find((c) => sel && c.type === sel.type && c.item.id === sel.id) || cands[0];
       if (hit) {
         const c = withMotion(hit.item, t);
@@ -1562,7 +1717,7 @@ class App {
       this.beginEdit();
       let nx = drag.ox + dx, ny = drag.oy + dy;
       const guides = [];
-      if (drag.type === 'text' || drag.type === 'shape' || drag.type === 'overlay') {
+      if (drag.type === 'text' || drag.type === 'shape' || drag.type === 'overlay' || drag.type === 'motion') {
         // 動き（to）がある場合は、終点も同じだけずらす
         if (drag.item.to && !drag.toOrig) drag.toOrig = { ...drag.item.to };
         if (Math.abs(nx - 0.5) < 0.025) { nx = 0.5; guides.push('v'); }
@@ -1601,6 +1756,11 @@ class App {
     };
     cv.addEventListener('pointerup', end);
     cv.addEventListener('pointercancel', end);
+  }
+
+  #motionBox(W, H, m, t) {
+    const e = catalogSync()?.byId[normRef(m.ref)];
+    return motionBox(W, H, withMotion(m, t), e?.width, e?.height);
   }
 
   /** 重ねた映像の表示枠（素材の縦横比を使う） */

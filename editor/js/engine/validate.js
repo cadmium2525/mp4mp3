@@ -10,9 +10,11 @@ const ANIM_SHAPE = ['none', 'fade', 'pop', 'slide', 'spin', 'wipe'];
 const LOOPS = ['none', 'pulse', 'float', 'spin', 'blink', 'shake'];
 const FONTS = ['gothic', 'rounded', 'mincho'];
 const CUTOUT = ['person', 'object', 'chroma'];
+const MOTION_MAX = 120; // Motion Prompt の要素数（取り込み時点）
 
 const KEYS = {
-  top: ['version', 'id', 'name', 'width', 'height', 'fps', 'background', 'fadeOut', 'media', 'clips', 'texts', 'audios', 'overlays', 'shapes', 'effects', 'updatedAt'],
+  top: ['version', 'id', 'name', 'width', 'height', 'fps', 'background', 'fadeOut', 'media', 'clips', 'texts', 'audios', 'overlays', 'motions', 'shapes', 'effects', 'updatedAt'],
+  motion: ['id', 'ref', 'start', 'end', 'x', 'y', 'w', 'cover', 'mode', 'hold', 'speed', 'offset', 'transparent', 'colors', 'opacity', 'rotation', 'scale', 'rx', 'ry', 'perspective', 'anim', 'animOut', 'loop', 'keys', 'to', 'ease'],
   media: ['id', 'name', 'kind', 'duration', 'width', 'height', 'hasAudio', 'silences'],
   clip: ['id', 'media', 'in', 'out', 'speed', 'volume', 'fit', 'zoom', 'x', 'y', 'kenburns', 'filter', 'transition', 'cutout'],
   text: ['id', 'text', 'start', 'end', 'style', 'font', 'color', 'stroke', 'strokeWidth', 'strokes', 'bg', 'shadow', 'glow', 'extrude', 'size', 'x', 'y', 'anim', 'animOut', 'opacity', 'rotation', 'scale', 'rx', 'ry', 'perspective', 'to', 'keys', 'ease'],
@@ -132,6 +134,19 @@ export function validateProject(p) {
     cutoutCheck(o.cutout, `${path}.cutout`);
     const dur = isNum(o.in) && isNum(o.out) ? (o.out - o.in) / (o.speed || 1) : null;
     motion(o, path, dur);
+  });
+  (p.motions || []).forEach((m, i) => {
+    const path = `motions[${i}]`;
+    unknown(m, 'motion', path);
+    const ref = String(m.ref ?? '').replace(/^#/, '');
+    if (!/^\d{1,3}$/.test(ref) || +ref < 1 || +ref > MOTION_MAX) err(`${path}.ref`, `Motion Prompt の番号（1〜${MOTION_MAX}）で指定してください（今は ${JSON.stringify(m.ref)}）`);
+    timing(m, path, m.end);
+    enumOf(m.mode, ['loop', 'once', 'hold', 'still'], `${path}.mode`);
+    if ((m.mode === 'hold' || m.mode === 'still') && !isNum(m.hold)) warn(`${path}.hold`, 'hold / still では止める位置（要素の中の秒）を hold に書いてください（省略時は1周の半分）');
+    num(m.speed, `${path}.speed`, { min: 0.05, max: 10 });
+    enumOf(m.anim, ANIM_SHAPE, `${path}.anim`);
+    if (m.colors != null && typeof m.colors !== 'object') err(`${path}.colors`, '{ "パレットのキー": "#rrggbb" } の形で指定してください');
+    motion(m, path, m.end - m.start);
   });
   (p.effects || []).forEach((e, i) => {
     const path = `effects[${i}]`;

@@ -34,6 +34,7 @@ export class Player {
     this.audioBufs = new Map();
     // 切り抜きの AI モデルを読み込み終えたら描き直す
     window.addEventListener('cutoutready', () => this.requestDraw());
+    window.addEventListener('motionready', () => this.requestDraw());
   }
 
   setProject(project) {

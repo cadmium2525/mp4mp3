@@ -168,6 +168,18 @@ button { font: inherit; color: inherit; }
 .blk.shape { background: #c2477a; }
 .blk.effect { background: #3d6fb3; }
 .blk.overlay { background: #8a6a1f; }
+.blk.motion { background: #2f6f8f; }
+.mp-tabs { position: sticky; top: -4px; background: var(--panel); z-index: 2; padding-bottom: 6px; }
+.mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.mp-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 0; overflow: hidden; text-align: left; cursor: pointer; }
+.mp-card canvas { display: block; width: 100%; aspect-ratio: 539 / 208; background: #000; }
+.mp-card b { display: block; font-size: 12.5px; padding: 6px 8px 0; }
+.mp-card small { display: block; font-size: 11px; color: var(--muted); padding: 2px 8px 8px; line-height: 1.35; }
+.mp-head canvas { width: 100%; aspect-ratio: 539 / 208; border-radius: 10px; background: #000; display: block; }
+.mp-spec { font-size: 12.5px; color: #d4d4da; padding-left: 18px; margin: 6px 0 0; }
+.pal-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+.pal-row label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.pal-row input { width: 30px; height: 30px; border: none; padding: 0; background: none; }
 .blk .kf {
   position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; transform: rotate(45deg);
   background: #fff; border: 1px solid rgba(0, 0, 0, 0.6); pointer-events: none; z-index: 1;

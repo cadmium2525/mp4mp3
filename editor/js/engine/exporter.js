@@ -5,6 +5,7 @@
 import * as MB from '../../lib/mediabunny.min.mjs';
 import { layoutClips, projectDuration, activeClipsAt, mediaTime, overlayEnd } from './project.js';
 import { loadCutout } from './cutout.js';
+import { ensureMotions } from './motionlib.js';
 import { drawFrame, loadFonts } from './render.js';
 import { mixdown } from './audio.js';
 
@@ -47,6 +48,7 @@ export async function exportVideo(project, lib, opts = {}) {
 
   await loadFonts(proj);
   onProgress(0, '準備中…');
+  await ensureMotions(proj);
   // 切り抜き用の AI モデルを先に読み込む
   const modes = new Set([...proj.clips, ...(proj.overlays || [])].map((x) => x.cutout?.mode).filter(Boolean));
   for (const m of modes) {

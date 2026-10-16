@@ -16,6 +16,7 @@ import { normalizeProject, layoutClips, activeClipsAt, mediaTime, overlayEnd } f
 import { exportVideo } from './js/engine/exporter.js';
 import { drawFrame, loadFonts } from './js/engine/render.js';
 import { loadCutout } from './js/engine/cutout.js';
+import { ensureMotions } from './js/engine/motionlib.js';
 
 async function load(projectJson) {
   const project = { ...projectJson, media: { ...projectJson.media } };
@@ -30,6 +31,7 @@ async function load(projectJson) {
   }
   const p = normalizeProject(project);
   await loadFonts(p);
+  await ensureMotions(p);
   const modes = new Set([...p.clips, ...p.overlays].map((x) => x.cutout?.mode).filter(Boolean));
   for (const m of modes) await loadCutout(m === 'object' ? 'object' : m === 'chroma' ? 'chroma' : 'person');
   return { project: p, lib };

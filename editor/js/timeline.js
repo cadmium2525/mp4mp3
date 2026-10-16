@@ -3,6 +3,7 @@
  */
 import { layoutClips, TRANSITIONS, overlayEnd } from './engine/project.js';
 import { SHAPES, EFFECTS } from './engine/fx.js';
+import { catalogSync, normRef } from './engine/motionlib.js';
 
 const el = (tag, cls, attrs = {}) => {
   const e = document.createElement(tag);
@@ -181,7 +182,18 @@ export class Timeline {
     const vrow2 = this.rows.ov;
     vrow2.textContent = '';
     const ovs = p.overlays || [];
-    const vl = assignLanes(ovs.map((o) => ({ id: o.id, start: o.start, end: overlayEnd(o) })));
+    const mos = p.motions || [];
+    const vl = assignLanes([...ovs.map((o) => ({ id: o.id, start: o.start, end: overlayEnd(o) })), ...mos]);
+    const cat = catalogSync();
+    for (const m of mos) {
+      const b = this.#block('motion', m.id, m.start, m.end - m.start, vl.lane.get(m.id), vl.count);
+      const lab = el('span', 'blabel');
+      const e = cat?.byId[normRef(m.ref)];
+      lab.textContent = `✦ #${normRef(m.ref)} ${e ? e.name.ja : ''}`;
+      b.append(lab);
+      addKeyMarks(b, m, m.end - m.start, this.pps);
+      vrow2.append(b);
+    }
     for (const o of ovs) {
       const len = overlayEnd(o) - o.start;
       const b = this.#block('overlay', o.id, o.start, len, vl.lane.get(o.id), vl.count);
