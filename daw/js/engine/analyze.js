@@ -303,7 +303,7 @@ export function guessChord(ch, bassCh) {
       const tn = Math.hypot(...t);
       let s = 0;
       for (let k = 0; k < 12; k++) s += v[k] * (t[k] / tn);
-      s -= iv.length * 0.012; // 構成音が多い和音ほど当てはまりやすいので少し割り引く
+      s -= Math.max(0, iv.length - 3) * 0.035; // 構成音が多い和音ほど当てはまりやすいので割り引く
       if (bassShare) s += 0.12 * bassShare[root]; // 低音がその音なら、それをルートとみなしやすく
       if (s > best.score) best = { name: pcName(root) + q, score: s, root };
     }
@@ -366,7 +366,9 @@ function tempo(flux, hopSec) {
     const l0 = Math.floor(lag), f = lag - l0;
     let s = 0;
     for (let i = 0; i + l0 + 1 < n; i++) s += x[i] * (x[i + l0] * (1 - f) + x[i + l0 + 1] * f);
-    if (!best || s > best.s) best = { bpm, s };
+    // 人がよく使うテンポ（110 前後）を少し優先して、倍・半分の取り違えを減らす
+    const prior = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 110) / 0.8, 2));
+    if (!best || s * prior > best.s) best = { bpm, s: s * prior };
   }
   return best.bpm;
 }

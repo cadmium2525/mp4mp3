@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>かなでる</title>
+  <meta name="description" content="iPhoneで使える無料のDAW（作曲アプリ）と効果音スタジオ。音を見える化しながら作曲・ミックス。端末内で処理します。">
+  <meta name="theme-color" content="#0f1115">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="かなでる">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="css/daw.css">
+</head>
+<body>
+  <!-- ホーム -->
+  <section id="home" class="screen">
+    <header class="home-top">
+      <div class="brand">
+        <img src="icons/icon.svg" alt="" width="36" height="36">
+        <div>
+          <h1>かなでる</h1>
+          <p>音を見ながら作る、作曲アプリ</p>
+        </div>
+      </div>
+      <nav class="sublinks"><a href="../">おとだけ</a><a href="../editor/">つなぐ</a></nav>
+    </header>
+    <div class="home-body">
+      <button class="sfx-entry" id="openSfx" type="button">
+        <span class="sfx-ico">✦</span>
+        <span><b>効果音スタジオ</b><small>クリック・ウーシュ・インパクトなど 48 種。層を重ねた本格的な効果音を作って書き出し</small></span>
+        <span class="chev">›</span>
+      </button>
+      <h2 class="home-h">新しい曲を作る</h2>
+      <div class="templates" id="templates"></div>
+      <div class="home-row">
+        <h2 class="home-h">曲</h2>
+        <button class="txt-btn" id="importJson" type="button">JSONから作成</button>
+      </div>
+      <ul class="songs" id="songs"></ul>
+      <details class="help">
+        <summary>使い方</summary>
+        <div class="help-body">
+          <p><b>基本：</b>ひな形を選ぶ → トラックの帯（クリップ）をタップして選び、もう一度タップで中身を編集 → ▶ で再生 → 右上の「書き出す」で WAV / MP3 に。</p>
+          <p><b>ピアノロール：</b>空いたところをタップで音を置く。音をタップで選択、ドラッグで移動、右端をドラッグで長さ。「和音」を選ぶとタップで和音ごと置けます。</p>
+          <p><b>見える化：</b>「見える化」タブで、再生中の音の周波数・音量をリアルタイムに表示。「全体を解析」で、ラウドネス・帯域バランス・和音・スマホのスピーカーでの聞こえ方まで調べて、気をつける点を教えてくれます。</p>
+          <p><b>自動ミックス：</b>ミキサーの「自動ミックス」で、各トラックの音量を役割（ドラム・ベース・メロディなど）に合わせて自動で整えます。</p>
+          <p><b>つなぐで使う：</b>書き出した音を「ファイル」に保存し、つなぐの「音楽」から読み込めます。</p>
+          <p><b>Claude と一緒に作る：</b>「…」→「JSONをコピー」と「見える化シート」の画像を Claude に送ると、音の状態が伝わります。返ってきた JSON を「JSONを貼り付け」で反映できます。形式は <a href="FORMAT.md" target="_blank">FORMAT.md</a>。</p>
+          <p><b>保存：</b>曲はこの端末のブラウザ内に自動保存されます。Safari の Webサイトデータを消すと消えるので、大切な曲は JSON でも保存してください。</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- 曲の編集 -->
+  <section id="song" class="screen" hidden>
+    <header class="ed-top">
+      <button class="icon-btn" id="back" type="button" aria-label="一覧に戻る"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="title-btn" id="songName" type="button"></button>
+      <button class="icon-btn" id="undo" type="button" aria-label="元に戻す"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
+      <button class="icon-btn" id="redo" type="button" aria-label="やり直す"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/></svg></button>
+      <button class="icon-btn" id="menuBtn" type="button" aria-label="メニュー"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+      <button class="export-btn" id="exportBtn" type="button">書き出す</button>
+    </header>
+    <div class="transport">
+      <button class="play" id="playBtn" type="button" aria-label="再生">
+        <svg viewBox="0 0 24 24" class="i-play"><path d="M7 4.5v15l12.5-7.5z"/></svg>
+        <svg viewBox="0 0 24 24" class="i-pause"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>
+      </button>
+      <button class="icon-btn sm" id="stopBtn" type="button" aria-label="先頭へ"><svg viewBox="0 0 24 24"><path d="M6 5v14M18 5L9 12l9 7z"/></svg></button>
+      <div class="pos"><b id="pos">1.1</b><small id="posSec">0:00.0</small></div>
+      <button class="chip" id="bpmBtn" type="button">120 BPM</button>
+      <button class="chip" id="loopBtn" type="button" aria-pressed="false">ループ</button>
+      <span class="status" id="status"></span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button type="button" data-tab="arrange" aria-selected="true">アレンジ</button>
+      <button type="button" data-tab="mixer">ミキサー</button>
+      <button type="button" data-tab="viz">見える化</button>
+    </nav>
+    <div class="view" id="arrangeView">
+      <div class="arr" id="arr"></div>
+      <div class="arr-tools">
+        <button class="btn sm" id="addTrack" type="button">＋ トラック</button>
+        <span class="spacer"></span>
+        <button class="icon-btn sm" id="zoomOut" type="button" aria-label="縮小"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+        <button class="icon-btn sm" id="zoomIn" type="button" aria-label="拡大"><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg></button>
+      </div>
+      <div class="clipbar" id="clipbar" hidden>
+        <button type="button" data-act="edit">編集</button>
+        <button type="button" data-act="dup">複製</button>
+        <button type="button" data-act="left">◀</button>
+        <button type="button" data-act="right">▶</button>
+        <button type="button" data-act="shorter">短く</button>
+        <button type="button" data-act="longer">長く</button>
+        <button type="button" data-act="del" class="danger">削除</button>
+      </div>
+    </div>
+    <div class="view" id="mixerView" hidden></div>
+    <div class="view" id="vizView" hidden></div>
+  </section>
+
+  <!-- 効果音スタジオ -->
+  <section id="sfx" class="screen" hidden>
+    <header class="ed-top">
+      <button class="icon-btn" id="sfxBack" type="button" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h2 class="ed-title">効果音スタジオ</h2>
+      <button class="export-btn" id="sfxExport" type="button">書き出す</button>
+    </header>
+    <div class="sfx-body" id="sfxBody"></div>
+  </section>
+
+  <!-- 下から出るパネル -->
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet-head"><h2 id="sheetTitle"></h2><button class="icon-btn sm" id="sheetClose" type="button" aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+
+  <!-- 全画面の編集（ピアノロール・ドラム） -->
+  <div class="full" id="full" hidden></div>
+
+  <div class="toast" id="toast" hidden></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

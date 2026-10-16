@@ -99,6 +99,12 @@ export const INST_PRESETS = {
     fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 200 }] }] },
 };
 
+/* ---------- ドラム：パーツごとの基準のピーク（dBFS、強さ 1 のとき） ---------- */
+export const DRUM_PEAK = {
+  kick: -6, kick808: -6, sub: -8, snare: -8, clap: -10, rim: -14, snap: -14, perc: -14,
+  hat: -17, ohat: -17, ride: -17, crash: -14, tom1: -9, tom2: -9, tom3: -8, tom: -9, shaker: -20, tamb: -18, cowbell: -16,
+};
+
 /* ---------- ドラムキット：パーツごとの調整 ---------- */
 export const KITS = {
   acoustic: { label: 'スタンダード', map: { kick: { punch: 0.5 }, snare: { space: 0.15 }, clap: {}, hat: {}, ohat: {}, ride: {}, crash: {} },

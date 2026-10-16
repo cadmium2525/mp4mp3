@@ -394,14 +394,17 @@ const MAKERS = {
     const hl = new Biquad(sr, 'hp', 60), hr = new Biquad(sr, 'hp', 60);
     const nz = new Noise('pink', 7), r = rng(11);
     const mix = param(ctx, s.mix, 1);
+    let cr = 0, crl = 0;
     return {
       process(L, R) {
         for (let i = 0; i < L.length; i++) {
           dl.write(L[i]); dr.write(R[i]);
           const t = i / sr;
           const d = wow * (1 + Math.sin(TAU * 0.55 * t)) + flutter * (1 + Math.sin(TAU * 7.3 * t)) + 4;
-          let n = nz.next() * noiseAmt;
-          if (r() < crackle * 0.0004) n += (r() - 0.5) * 0.25;
+          if (r() < crackle * 0.0004) cr = (r() - 0.5) * 0.5;
+          cr *= 0.82; // 数サンプルで減衰する粒（1サンプルの針より耳に痛くない）
+          crl = crl + 0.35 * (cr - crl);
+          let n = nz.next() * noiseAmt + crl;
           const wl = softClip(tl.next(hl.next(dl.read(d))) * 1.2) / 1.1 + n;
           const wr = softClip(tr.next(hr.next(dr.read(d))) * 1.2) / 1.1 + n;
           mixInto(L, R, wl, wr, mix, i);
@@ -449,8 +452,19 @@ export function limit(L, R, sr, ceilingDb = -1, release = 0.08, lookahead = 0.00
   const la = Math.max(1, Math.round(lookahead * sr));
   // 各サンプルで必要なゲイン
   const need = new Float32Array(n);
+  // サンプルの間の山（トゥルーピーク）も見積もる（3次補間で 1/4・1/2・3/4 の位置）
+  const ip = (x, i) => {
+    const a = x[i - 1] ?? x[i], b = x[i], c = x[i + 1] ?? x[i], d = x[i + 2] ?? c;
+    let m = Math.abs(b);
+    for (const t of [0.25, 0.5, 0.75]) {
+      const v = b + 0.5 * t * (c - a + t * (2 * a - 5 * b + 4 * c - d + t * (3 * (b - c) + d - a)));
+      if (Math.abs(v) > m) m = Math.abs(v);
+    }
+    return m;
+  };
   for (let i = 0; i < n; i++) {
-    const p = Math.max(Math.abs(L[i]), Math.abs(R[i]));
+    let p = Math.max(Math.abs(L[i]), Math.abs(R[i]));
+    if (p > ceil * 0.7) p = Math.max(ip(L, i), ip(R, i));
     need[i] = p > ceil ? ceil / p : 1;
   }
   // 先読み区間の最小値（単調キュー）

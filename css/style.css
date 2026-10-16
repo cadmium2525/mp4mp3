@@ -83,6 +83,7 @@ main, .top {
   white-space: nowrap;
 }
 .badge.link { color: var(--accent); }
+.badges { display: flex; gap: 6px; }
 
 h2 { font-size: 17px; margin: 0; }
 h3 { font-size: 14px; margin: 18px 0 8px; color: var(--muted); font-weight: 600; }

@@ -5,10 +5,10 @@
  */
 import { stereo, dbToGain, panGains, curve, hashSeed, clamp } from './dsp.js';
 import { renderNotes } from './instruments.js';
-import { resolveInst, KITS } from './presets.js';
+import { resolveInst, KITS, DRUM_PEAK, INST_PRESETS } from './presets.js';
 import { renderSfx, sfxFromPreset, drum } from './sfx.js';
 import { applyChain, limit } from './fx.js';
-import { loudness } from './analyze.js';
+import { loudness, truePeak } from './analyze.js';
 import { trackNotes, toSamples, songBeats, secPerBeat, beatsPerBar, SR } from './song.js';
 
 /** トラックの楽器・ドラム・効果音を鳴らした生の音（エフェクト前） */
@@ -40,7 +40,12 @@ function renderSource(song, track, n, sr, onProgress) {
         const def = drum(piece, { ...opt, vel: vb }, undefined);
         def.seed = hashSeed(key) % 100000;
         def.normalize = null;
-        buf = renderSfx({ ...def, layers: def.layers.map((l) => l) }, sr);
+        buf = renderSfx(def, sr);
+        // パーツごとに決まったピークにそろえる（強弱は下の g で付ける）
+        let pk = 0;
+        for (let i = 0; i < buf[0].length; i++) pk = Math.max(pk, Math.abs(buf[0][i]), Math.abs(buf[1][i]));
+        const target = dbToGain(DRUM_PEAK[name] ?? DRUM_PEAK[piece] ?? -12);
+        if (pk > 0) { const gg = target / pk; for (const ch of buf) for (let i = 0; i < ch.length; i++) ch[i] *= gg; }
         cache.set(key, buf);
       }
       const jitter = hum.time ? (((hashSeed(key + k) % 1000) / 1000 - 0.5) * 2 * hum.time) : 0;
@@ -185,6 +190,9 @@ export function renderSong(song, opts = {}) {
   } else {
     limit(L, R, sr, ceiling - 0.3, 0.06, 0.005);
   }
+  // 最後にトゥルーピークを測り、上限を超えていれば全体を少し下げる（サンプル間の山の対策）
+  const tp = truePeak(L, R), cg = dbToGain(ceiling);
+  if (tp > cg) { const g = (cg / tp) * 0.995; for (let i = 0; i < n; i++) { L[i] *= g; R[i] *= g; } }
   // フェードアウト
   const fo = Math.round((m.fadeOut ?? 0) * sr);
   const endS = Math.round(beats * secPerBeat(song) * sr);
@@ -212,4 +220,45 @@ function hasSidechain(tr) {
 function usedPatterns(song, tr) {
   const ids = new Set((tr.clips || []).map((c) => c.pattern).filter(Boolean));
   return [...ids].map((id) => song.patterns?.[id]);
+}
+
+/* ---------------- 自動ミックス ---------------- */
+
+/** トラックの役割（音量の目安を決めるため） */
+export function trackRole(tr) {
+  const type = tr.type || (tr.kit ? 'drums' : tr.clips?.some((c) => c.sfx) ? 'sfx' : 'inst');
+  if (type !== 'inst') return type;
+  const name = typeof tr.inst === 'string' ? tr.inst : tr.inst?.preset;
+  const cat = INST_PRESETS[name]?.cat;
+  if (cat === 'bass') return 'bass';
+  if (cat === 'pad') return 'pad';
+  if (cat === 'lead') return 'lead';
+  return 'harmony';
+}
+
+/** 役割ごとの、トラック単体のラウドネスの目安（LUFS）。ここから全体を -14 付近に合わせる */
+export const ROLE_TARGET = { drums: -19, bass: -21, lead: -22, harmony: -22.5, pad: -26, sfx: -24 };
+
+/**
+ * トラックごとの音を測って、役割に合った音量に揃える（自動ミックス）。
+ * lead（メロディ）があるときは伴奏を少し下げる。戻り値：{ id: 新しい volume(dB) }
+ */
+export function autoMix(song, opts = {}) {
+  const sr = opts.sr || 24000; // 測るだけなので軽く
+  const flat = { ...song, master: { ...(song.master || {}), loudness: null, fx: [] }, sends: { ...(song.sends || {}), reverb: { ...(song.sends?.reverb || {}), volume: -120 }, delay: { ...(song.sends?.delay || {}), volume: -120 } } };
+  flat.tracks = song.tracks.map((t) => ({ ...t, volume: 0, pan: 0, mute: false, solo: false }));
+  const out = renderSong(flat, { sr, stems: true, onProgress: opts.onProgress });
+  const hasLead = song.tracks.some((t) => trackRole(t) === 'lead' && !t.mute);
+  const res = {};
+  for (const tr of song.tracks) {
+    const id = tr.id || tr.name;
+    const st = out.stems[id];
+    if (!st) continue;
+    const lu = loudness(st[0], st[1], sr);
+    if (!Number.isFinite(lu)) continue;
+    let target = ROLE_TARGET[trackRole(tr)] ?? -23;
+    if (hasLead && trackRole(tr) === 'harmony') target -= 1.5;
+    res[id] = Math.max(-40, Math.min(12, Math.round((target - lu) * 2) / 2));
+  }
+  return res;
 }
