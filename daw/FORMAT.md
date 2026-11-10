@@ -178,3 +178,31 @@ node daw/tools/audition.mjs inst|sfx 一覧.png                 # プリセッ�
 - トラック別のラウドネス・帯域と、低域〜中低域のかぶり
 - クリックノイズ（波形の不連続）の疑いのある時刻
 - 見える化シート：波形＋短時間ラウドネス、スペクトログラム、クロマ（音名ごとの強さ）と和音、ピアノロール、帯域バランス、トラック別
+
+## 自動アレンジ・おまかせ作曲
+
+**和音トラック**：`"chords": [[0, "Am7"], [4, "Fmaj7"], [8, "C"], [12, "G/B"]]`（拍, 和音記号。オクターブは付けない）。
+調・音階は `"key": "A minor"`（major / minor / dorian / pentatonic / yo（陽音階）など）。
+
+**自動クリップ**：`notes` の代わりに `gen` を書くと、和音トラックに合わせて演奏が作られます（`len` が必要。同じシードなら毎回同じ演奏）。
+
+```jsonc
+{ "at": 0, "len": 32, "gen": { "type": "chords", "style": "pad", "seed": 1 } }       // 伴奏：pad / whole / quarters / piano8 / ballad / strum / stab / offbeat …
+{ "at": 0, "len": 32, "gen": { "type": "arp", "pattern": "updown", "rate": "1/16", "octaves": 2 } }
+{ "at": 0, "len": 32, "gen": { "type": "bass", "style": "walking" } }               // root / half / root8 / octave / offbeat / walking / synco / funk / 808 / pedal / reggae / bossa
+{ "at": 0, "len": 32, "gen": { "type": "drums", "style": "lofi", "intensity": 0.6, "fill": 4 } }   // pop / rock / lofi / hiphop / trap / house / disco / dnb / funk / bossa / ballad / halftime / shuffle / jazz / cinematic / taiko …
+{ "at": 0, "len": 32, "gen": { "type": "melody", "contour": "arch", "form": "AABA", "density": 0.5 } }
+```
+
+**おまかせ作曲**（アプリのホーム、または下のコマンド）。スタイル：
+lofi / pop / edm / cinematic / wafu / rock / jazz / ballad / funk / 8bit / ambient / trap / corporate / kawaii / epic / tension / comedy / acoustic
+
+```sh
+node daw/tools/compose.mjs --style corporate --seconds 45 --seed 3 [--key "D minor"] [--bpm 100] out.json
+```
+
+`--seconds` を指定すると、余韻まで含めてちょうどその長さの曲になります（動画の BGM 用）。出力の JSON はそのまま編集・描画でき、
+つなぐ の `audios` に `{ "song": <この JSON>, "start": 0 }` と書けば動画に付きます。
+エンジンからは `compose(opts)` / `fitToLength(song, seconds)` / `bake(song)`（自動クリップを音符に変換）が使えます（`js/engine/arranger.js`）。
+
+追加のエフェクト：`phaser` `flanger` `vibrato` `autopan` `autofilter` `ringmod` `exciter`（高域の倍音を足す）`multiband` `shimmer` `gate`（pattern で刻む）`stutter` `tapestop`。

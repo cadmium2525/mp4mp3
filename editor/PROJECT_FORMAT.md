@@ -377,3 +377,5 @@ Chromium が H.264 に対応していない環境では VP9/Opus で書き出さ
 
 - 効果音の自動付け：`node editor/tools/autosfx.mjs project.json out.json`（文字や図形の出現・切り替え・エフェクトに合わせて `audios` に追加。アプリでは「音楽・音」→「効果音を自動で付ける」）
 - モーションブラー：プロジェクトに `"motionBlur": 8`（1 コマを 8 回に刻んで重ねる。0 でなし）
+
+作例：`examples/showreel.json`（素材ゼロ。映像・曲・効果音すべてこの JSON だけで作れる。`node editor/tools/render.mjs editor/examples/showreel.json 空のフォルダ out.mp4`）

@@ -500,5 +500,5 @@ export async function loadFonts(project) {
     const f = FONTS[tx.font] || FONTS.gothic;
     jobs.push(document.fonts.load(`${f.weight} 40px ${f.family}`, tx.text).catch(() => {}));
   }
-  await Promise.race([Promise.all(jobs), new Promise((r) => setTimeout(r, 4000))]);
+  await Promise.race([Promise.all(jobs), new Promise((r) => setTimeout(r, 12000))]);
 }
