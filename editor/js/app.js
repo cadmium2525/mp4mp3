@@ -8,10 +8,14 @@ import { drawText, measureText, loadFonts, overlayBox } from './engine/render.js
 import { SHAPES, EFFECTS, drawShape, shapeBox, withMotion, keyStates, itemEnd, ANIM_PROPS, GRADIENTS } from './engine/fx.js';
 import { loadCutout, cutoutReady } from './engine/cutout.js';
 import { validateProject } from './engine/validate.js';
+import { GRADES } from './engine/post.js';
 import { loadCatalog, catalogSync, loadPack, drawMotionElement, motionBox, normRef, element as motionElement } from './engine/motionlib.js';
 import { Player } from './player.js';
 import { Timeline } from './timeline.js';
 import * as store from './store.js';
+import { installExtras } from './extras.js';
+import { GENS } from './engine/gens/index.js';
+import { expandGenerated, synthFile } from './engine/synth.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const h = (tag, props = {}, ...children) => {
@@ -34,6 +38,7 @@ const fmt = (s) => {
 };
 
 const ICONS = {
+  gen: '<path d="M12 3l2.2 5.6L20 9.3l-4.4 3.9L17 19l-5-3-5 3 1.4-5.8L4 9.3l5.8-.7z"/>',
   add: '<path d="M12 5v14M5 12h14"/>',
   media: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9.5v5l4-2.5z"/>',
   text: '<path d="M5 6h14M12 6v13M9 19h6"/>',
@@ -321,7 +326,7 @@ class App {
 
   listOf(type) {
     const p = this.project;
-    return { clip: p.clips, text: p.texts, audio: p.audios, shape: p.shapes, effect: p.effects, overlay: p.overlays, motion: p.motions }[type];
+    return { clip: p.clips, text: p.texts, audio: p.audios, shape: p.shapes, effect: p.effects, overlay: p.overlays, motion: p.motions, gen: (p.gens ||= []) }[type];
   }
 
   findItem(type, id) {
@@ -385,7 +390,7 @@ class App {
     const p = this.project;
     const t = this.player.t;
     const sel = this.timeline.selection;
-    if (sel && ['text', 'shape', 'effect', 'motion'].includes(sel.type)) {
+    if (sel && ['text', 'shape', 'effect', 'motion', 'gen'].includes(sel.type)) {
       const tx = this.findItem(sel.type, sel.id);
       const list = this.listOf(sel.type);
       if (t <= tx.start + 0.1 || t >= tx.end - 0.1) return toast('途中に再生ヘッドを合わせてください');
@@ -469,7 +474,7 @@ class App {
     copy.id = uid(sel.type[0]);
     this.change(() => {
       if (sel.type === 'clip') p.clips.splice(p.clips.indexOf(item) + 1, 0, copy);
-      if (['text', 'shape', 'effect', 'motion'].includes(sel.type)) {
+      if (['text', 'shape', 'effect', 'motion', 'gen'].includes(sel.type)) {
         const d = item.end - item.start;
         copy.start = item.end;
         copy.end = item.end + d;
@@ -507,7 +512,7 @@ class App {
       } else if (mode === 'right') {
         item.out = Math.max(item.in + 0.2, Math.min(maxOut, orig.out + dt * sp));
       }
-    } else if (type === 'text' || type === 'shape' || type === 'effect' || type === 'motion') {
+    } else if (type === 'text' || type === 'shape' || type === 'effect' || type === 'motion' || type === 'gen') {
       const snap = (v) => (Math.abs(v - this.player.t) * this.timeline.pps < 10 ? this.player.t : v);
       if (mode === 'left') item.start = Math.max(0, Math.min(orig.end - 0.2, snap(orig.start + dt)));
       if (mode === 'right') item.end = Math.max(orig.start + 0.2, snap(orig.end + dt));
@@ -567,7 +572,8 @@ class App {
       tool('pip', 'ワイプ', () => $('#fileOverlay').click());
       tool('shape', '図形', () => this.addShapeDialog());
       tool('fx', 'エフェクト', () => this.addEffectDialog());
-      tool('music', '音楽・音', () => $('#fileAudio').click());
+      tool('gen', 'ジェネレーター', () => this.addGenDialog());
+      tool('music', '音楽・音', () => this.audioMenu());
       tool('split', '分割', () => this.splitAtPlayhead());
       tool('ratio', '比率・設定', () => this.openProjectSettings());
       return;
@@ -605,7 +611,7 @@ class App {
       tool('dup', '複製', () => this.duplicateSelected());
       tool('front', '最前面へ', () => this.bringToFront());
       tool('del', '削除', () => this.deleteSelected(), 'danger');
-    } else if (sel.type === 'shape' || sel.type === 'effect') {
+    } else if (sel.type === 'shape' || sel.type === 'effect' || sel.type === 'gen') {
       tool('edit', '編集', () => this.openInspector());
       tool('split', '分割', () => this.splitAtPlayhead());
       tool('dup', '複製', () => this.duplicateSelected());
@@ -724,6 +730,7 @@ class App {
     if (sel.type === 'effect') this.#effectSheet(item);
     if (sel.type === 'overlay') this.#overlaySheet(item, section);
     if (sel.type === 'motion') this.#motionSheet(item);
+    if (sel.type === 'gen') this.genSheet(item);
   }
 
   #clipSheet(c, section) {
@@ -1363,6 +1370,10 @@ class App {
       body.append(
         this.seg('種類', Object.entries(EFFECTS).map(([k, d]) => [k, `${d.icon} ${d.label}`]), e.type, (v) => { e.type = v; }),
         this.slider('強さ', e.intensity ?? 0.6, 0.05, 1, 0.01, (v) => `${Math.round(v * 100)}%`, (v) => { e.intensity = v; }),
+        ...(EFFECTS[e.type]?.params || []).map(([k, label, min, max, step, def]) => this.slider(label, e.params?.[k] ?? def, min, max, step, (v) => String(Math.round(v * 100) / 100), (v) => { e.params = { ...(e.params || {}), [k]: v }; })),
+        e.type === 'grade' ? this.seg('色あい', Object.entries(GRADES).map(([k, g]) => [k, g.label]), e.params?.preset || 'cinematic', (v) => { e.params = { ...(e.params || {}), preset: v }; }) : null,
+        EFFECTS[e.type]?.layer === 'post' ? this.seg('かける範囲', [['all', '画面全体'], ['video', '映像だけ（文字などは除く）']], e.on || 'all', (v) => { e.on = v; }) : null,
+        EFFECTS[e.type]?.layer === 'post' ? this.seg('音に反応', [['', 'しない'], ['kick', 'キック'], ['bass', '低音'], ['level', '全体の音量']], e.react?.src || '', (v) => { if (v) e.react = { src: v, amount: 1 }; else delete e.react; }) : null,
         this.#timingButtons(e, reopen),
         h('div', { class: 'sec' }, h('button', { class: 'btn', type: 'button', onclick: () => { this.player.seek(e.start); this.player.play(); } }, '▶ この部分を再生')),
       );
@@ -1473,7 +1484,7 @@ class App {
       const ta = h('textarea', { rows: '10', placeholder: '{ "clips": [...], "texts": [...] }' });
       const report = h('ul', { class: 'note' });
       body.append(ta, report, h('div', { class: 'sec' }, h('button', {
-        class: 'btn primary wide', type: 'button', onclick: () => {
+        class: 'btn primary wide', type: 'button', onclick: async () => {
           let data;
           try { data = JSON.parse(ta.value); } catch (err) { return toast('JSON として読めません：' + err.message, 5000); }
           const v = validateProject({ ...data, media: { ...this.project.media, ...(data.media || {}) } });
@@ -1483,6 +1494,7 @@ class App {
           }
           if (v.errors.length) return toast(`エラーが ${v.errors.length} 件あります（下に表示）`, 4000);
           try {
+            data = await this.ensureGenerated(data);
             this.applyJson(data);
             if (!v.warnings.length) this.closeSheet();
             toast(v.warnings.length ? `反映しました（注意 ${v.warnings.length} 件）` : '反映しました（元に戻すボタンで取り消せます）', 4000);
@@ -1493,6 +1505,22 @@ class App {
       }, '反映する')), h('p', { class: 'note' }, '今の素材をそのまま使い、編集内容だけを置き換えます。'));
       setTimeout(() => ta.focus(), 100);
     }, { tall: true });
+  }
+
+  /** JSON の中の「かなでるで作る音」（sfx / song / media の gen）を作って、素材として登録する */
+  async ensureGenerated(data) {
+    data = expandGenerated(data);
+    const p = this.project;
+    for (const [id, m] of Object.entries(data.media || {})) {
+      if (!m?.gen || p.media[id]) continue;
+      toast('音を作成中…', 60000);
+      const file = await synthFile(m.gen, m.name || `${id}.wav`);
+      const meta = await this.lib.add(file, id);
+      meta.gen = m.gen;
+      p.media[id] = meta;
+      await store.putMedia(p.id, meta, file);
+    }
+    return data;
   }
 
   /** 貼り付けた JSON を今のプロジェクトに反映（素材は ID か ファイル名で対応付け） */
@@ -1538,7 +1566,7 @@ class App {
   }
 
   async finishImport(files) {
-    const data = this.pendingImport;
+    const data = this.pendingImport ? expandGenerated(this.pendingImport) : null;
     this.pendingImport = null;
     this.closeSheet();
     if (!data) return;
@@ -1548,9 +1576,12 @@ class App {
     const missing = [];
     toast('素材を読み込み中…', 60000);
     for (const [id, m] of Object.entries(data.media || {})) {
-      const f = [...files].find((x) => x.name === m.name);
+      let f = [...files].find((x) => x.name === m.name);
+      // かなでるのエンジンで作る音（効果音・曲）
+      if (!f && m.gen) { try { f = await synthFile(m.gen, m.name || `${id}.wav`); } catch (err) { toast('音を作れませんでした：' + err.message, 4000); } }
       if (!f) { missing.push(m.name); continue; }
       const meta = await lib.add(f, id);
+      if (m.gen) meta.gen = m.gen;
       project.media[id] = meta;
       await store.putMedia(project.id, meta, f);
     }
@@ -1606,11 +1637,13 @@ class App {
       const status = h('p', { class: 'note' }, '');
       const go = h('button', { class: 'btn primary wide', type: 'button' }, '書き出しを始める');
       const area = h('div', { class: 'sec' });
-      go.onclick = () => this.#runExport({ res, quality, bar, status, go, area });
+      let motionBlur = p.motionBlur || 0;
+      go.onclick = () => this.#runExport({ res, quality, bar, status, go, area, motionBlur });
       upd();
       body.append(
         h('div', { class: 'sec' }, h('div', { class: 'lbl' }, h('span', {}, '解像度')), resSeg),
         h('div', { class: 'sec' }, h('div', { class: 'lbl' }, h('span', {}, '画質')), qSeg),
+        this.seg('モーションブラー（速い動きをなめらかに。書き出しは遅くなります）', [[0, 'なし'], [4, '弱'], [8, '強']], motionBlur, (v) => { motionBlur = v; p.motionBlur = v; }),
         h('div', { class: 'sec' }, info),
         h('div', { class: 'sec' }, go, bar, status),
         area,
@@ -1623,7 +1656,7 @@ class App {
     }, { tall: true });
   }
 
-  async #runExport({ res, quality, bar, status, go, area }) {
+  async #runExport({ res, quality, bar, status, go, area, motionBlur = 0 }) {
     go.disabled = true;
     const ac = new AbortController();
     const cancel = h('button', { class: 'btn danger wide', type: 'button', onclick: () => ac.abort() }, '中止');
@@ -1636,6 +1669,7 @@ class App {
       const r = await exportVideo(this.project, this.lib, {
         shortSide: res,
         quality,
+        motionBlur,
         signal: ac.signal,
         onProgress: (p, label) => {
           bar.firstChild.style.width = `${Math.round(p * 100)}%`;
@@ -1892,6 +1926,7 @@ function toast(msg, ms = 2400) {
   toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
 
+installExtras(App, { h, toast });
 window.app = new App();
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {

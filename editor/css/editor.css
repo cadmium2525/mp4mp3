@@ -170,6 +170,8 @@ button { font: inherit; color: inherit; }
 .blk.effect { background: #3d6fb3; }
 .blk.overlay { background: #8a6a1f; }
 .blk.motion { background: #2f6f8f; }
+.blk.gen { background: #6d4bd8; }
+.blk.gen .blabel { top: 50%; bottom: auto; transform: translateY(-50%); }
 .mp-tabs { position: sticky; top: -4px; background: var(--panel); z-index: 2; padding-bottom: 6px; }
 .mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .mp-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 0; overflow: hidden; text-align: left; cursor: pointer; }
@@ -318,3 +320,11 @@ button { font: inherit; color: inherit; }
   .tl-labels span:nth-child(1) { height: 74px; }
   .sheet { left: auto; right: 16px; bottom: 16px; width: 420px; border-radius: 16px; max-height: 80dvh; }
 }
+
+/* ---------- ジェネレーター・音のメニュー ---------- */
+.gen-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gen-list.one { grid-template-columns: 1fr; }
+.gen-item { text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
+.gen-item b { font-size: 14px; }
+.gen-item small { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+.gen-item:active { transform: scale(0.98); }

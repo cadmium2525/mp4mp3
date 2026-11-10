@@ -4,7 +4,9 @@
  */
 import { layoutClips, projectDuration, activeClipsAt, mediaTime, overlayEnd } from './engine/project.js';
 import { drawFrame } from './engine/render.js';
-import { scheduleAudio } from './engine/audio.js';
+import { scheduleAudio, mixdown } from './engine/audio.js';
+import { AudioFeatures, needsAudio } from './engine/audiofeat.js';
+import { GENS } from './engine/gens/index.js';
 
 export class Player {
   /**
@@ -50,11 +52,28 @@ export class Player {
       this.audioBufs.set(id, null);
       this.lib.previewAudio(id).then((b) => {
         this.audioBufs.set(id, b);
+        this.scheduleFeatures();
         this.onAudioReady?.(id);
       });
     }
     if (this.playing) this.#restartAudio();
+    this.scheduleFeatures();
     this.requestDraw();
+  }
+
+  /** 音に連動する映像があるときだけ、プレビュー用に音を解析する（変更のたびに少し待ってから） */
+  scheduleFeatures() {
+    clearTimeout(this.featTimer);
+    if (!this.project || !needsAudio(this.project, GENS)) { this.features = null; return; }
+    this.featTimer = setTimeout(async () => {
+      const proj = this.project, layout = this.layout;
+      try {
+        const buf = await mixdown(proj, layout, (id) => this.audioBufs.get(id) || null, 22050);
+        if (proj !== this.project) return;
+        this.features = new AudioFeatures(buf.getChannelData(0), buf.numberOfChannels > 1 ? buf.getChannelData(1) : null, 22050);
+        this.requestDraw();
+      } catch { /* 音がまだない */ }
+    }, 500);
   }
 
   #sizeCanvas() {
@@ -144,7 +163,11 @@ export class Player {
     if (!this.project) return;
     this.#assignSlots(Math.min(this.t, Math.max(0, this.duration - 1e-3)));
     const p = { ...this.project, width: this.canvas.width, height: this.canvas.height };
-    drawFrame(this.ctx, p, this.layout, Math.min(this.t, Math.max(0, this.duration - 1e-3)), (L, mt) => this.#source(L, mt), { hideTextId: this.hideTextId, preview: true, playing: this.playing });
+    drawFrame(this.ctx, p, this.layout, Math.min(this.t, Math.max(0, this.duration - 1e-3)), (L, mt) => this.#source(L, mt), {
+      hideTextId: this.hideTextId, preview: true, playing: this.playing, audio: this.features,
+      // シミュレーションが追いついていないときは、続きを計算するためにもう一度描く
+      onPending: () => { if (!this.playing) setTimeout(() => this.requestDraw(), 0); },
+    });
     if (this.overlay) { this.ctx.save(); this.overlay(this.ctx, this.scale); this.ctx.restore(); }
   }
 

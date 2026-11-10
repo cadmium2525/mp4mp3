@@ -1,6 +1,7 @@
 /*
  * タイムライン。中央の再生ヘッドは固定で、下のトラックを横スクロールして位置を合わせる（スマホ向け）。
  */
+import { GENS } from './engine/gens/index.js';
 import { layoutClips, TRANSITIONS, overlayEnd } from './engine/project.js';
 import { SHAPES, EFFECTS } from './engine/fx.js';
 import { catalogSync, normRef } from './engine/motionlib.js';
@@ -183,7 +184,8 @@ export class Timeline {
     vrow2.textContent = '';
     const ovs = p.overlays || [];
     const mos = p.motions || [];
-    const vl = assignLanes([...ovs.map((o) => ({ id: o.id, start: o.start, end: overlayEnd(o) })), ...mos]);
+    const gens = p.gens || [];
+    const vl = assignLanes([...ovs.map((o) => ({ id: o.id, start: o.start, end: overlayEnd(o) })), ...mos, ...gens]);
     const cat = catalogSync();
     for (const m of mos) {
       const b = this.#block('motion', m.id, m.start, m.end - m.start, vl.lane.get(m.id), vl.count);
@@ -192,6 +194,14 @@ export class Timeline {
       lab.textContent = `✦ #${normRef(m.ref)} ${e ? e.name.ja : ''}`;
       b.append(lab);
       addKeyMarks(b, m, m.end - m.start, this.pps);
+      vrow2.append(b);
+    }
+    for (const g of gens) {
+      const b = this.#block('gen', g.id, g.start, g.end - g.start, vl.lane.get(g.id), vl.count);
+      const lab = el('span', 'blabel');
+      lab.textContent = `◆ ${GENS[g.type]?.label || g.type}`;
+      b.append(lab);
+      addKeyMarks(b, g, g.end - g.start, this.pps);
       vrow2.append(b);
     }
     for (const o of ovs) {

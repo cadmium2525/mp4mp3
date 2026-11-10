@@ -9,7 +9,7 @@ import './post.js'; // 仕上げエフェクトを EFFECTS に登録
 const ANIM_TEXT = ['none', 'fade', 'pop', 'slide', 'typewriter'];
 const ANIM_SHAPE = ['none', 'fade', 'pop', 'slide', 'spin', 'wipe'];
 const LOOPS = ['none', 'pulse', 'float', 'spin', 'blink', 'shake'];
-const FONTS = ['gothic', 'rounded', 'mincho'];
+const FONTS = ['gothic', 'rounded', 'mincho', 'mono', 'thin'];
 const CUTOUT = ['person', 'object', 'chroma'];
 const MOTION_MAX = 120; // Motion Prompt の要素数（取り込み時点）
 
@@ -18,7 +18,7 @@ const KEYS = {
   motion: ['id', 'ref', 'start', 'end', 'x', 'y', 'w', 'cover', 'mode', 'hold', 'speed', 'offset', 'transparent', 'colors', 'opacity', 'rotation', 'scale', 'rx', 'ry', 'perspective', 'anim', 'animOut', 'loop', 'keys', 'to', 'ease'],
   media: ['id', 'name', 'kind', 'duration', 'width', 'height', 'hasAudio', 'silences', 'gen'],
   clip: ['id', 'media', 'in', 'out', 'speed', 'volume', 'fit', 'zoom', 'x', 'y', 'kenburns', 'filter', 'transition', 'cutout'],
-  text: ['id', 'text', 'start', 'end', 'style', 'font', 'color', 'stroke', 'strokeWidth', 'strokes', 'bg', 'shadow', 'glow', 'extrude', 'size', 'x', 'y', 'anim', 'animOut', 'opacity', 'rotation', 'scale', 'rx', 'ry', 'perspective', 'to', 'keys', 'ease'],
+  text: ['id', 'text', 'start', 'end', 'style', 'font', 'color', 'stroke', 'strokeWidth', 'strokes', 'bg', 'shadow', 'glow', 'extrude', 'size', 'x', 'y', 'anim', 'animOut', 'opacity', 'rotation', 'scale', 'rx', 'ry', 'perspective', 'to', 'keys', 'ease', 'count', 'typeSpeed', 'cursor', 'align', 'react'],
   shape: ['id', 'kind', 'start', 'end', 'x', 'y', 'w', 'h', 'rotation', 'fill', 'stroke', 'strokeWidth', 'radius', 'opacity', 'shadow', 'anim', 'animOut', 'loop', 'scale', 'rx', 'ry', 'perspective', 'to', 'keys', 'ease'],
   overlay: ['id', 'media', 'start', 'in', 'out', 'speed', 'volume', 'x', 'y', 'w', 'rotation', 'opacity', 'scale', 'rx', 'ry', 'perspective', 'mask', 'radius', 'border', 'borderColor', 'shadow', 'anim', 'animOut', 'loop', 'keys', 'to', 'ease', 'cutout'],
   effect: ['id', 'type', 'start', 'end', 'intensity', 'params', 'on', 'react', 'keys', 'to', 'ease', 'scale', 'x', 'y', 'rotation'],

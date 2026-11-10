@@ -329,7 +329,7 @@ function animState(tx, t) {
       break;
     }
     case 'slide': st.dy = (1 - (1 - (1 - p) ** 3)) * 0.4; st.alpha *= p; break;
-    case 'typewriter': st.chars = Math.floor(local / 0.07) + 1; break;
+    case 'typewriter': st.chars = Math.floor(local * (tx.typeSpeed || 14)) + 1; break;
   }
   return st;
 }
@@ -343,8 +343,21 @@ function strokeList(tx) {
 }
 
 /** テキストのレイアウトを計算（描画とドラッグ判定の両方で使う。t を渡すと動きも反映） */
+/** 数字のカウント：count = { from, to, dur, decimals, sep, ease }。text の中の {n} を数字に置き換える（なければ全体） */
+function countText(tx, t) {
+  const c = tx.count;
+  if (!c || t == null) return tx.text;
+  const u = Math.min(1, Math.max(0, (t - tx.start - (c.delay || 0)) / Math.max(0.05, c.dur ?? 1.2)));
+  const e = c.ease === 'linear' ? u : 1 - (1 - u) ** 3;
+  const v = (c.from ?? 0) + ((c.to ?? 100) - (c.from ?? 0)) * e;
+  const d = c.decimals ?? 0;
+  let str = v.toFixed(d);
+  if (c.sep !== false) str = str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return String(tx.text).includes('{n}') ? String(tx.text).replace('{n}', str) : str;
+}
+
 export function measureText(ctx, W, H, tx, t) {
-  if (t != null) tx = withMotion(tx, t);
+  if (t != null) { tx = withMotion(tx, t); if (tx.count) tx = { ...tx, text: countText(tx, t) }; }
   const font = FONTS[tx.font] || FONTS.gothic;
   const px = Math.max(8, tx.size * Math.min(W, H) * (tx.scale ?? 1));
   ctx.font = `${font.weight} ${px}px ${font.family}`;
@@ -368,7 +381,8 @@ function textBounds(ctx, W, H, tx, t) {
 
 export function drawText(ctx, W, H, tx0, t) {
   if (t < tx0.start || t >= tx0.end || !String(tx0.text).trim()) return;
-  const tx = withMotion(tx0, t);
+  let tx = withMotion(tx0, t);
+  if (tx.count) tx = { ...tx, text: countText(tx, t) };
   const m = measureText(ctx, W, H, tx);
   const a = animState(tx, t);
   const alpha = a.alpha * (tx.opacity ?? 1);
@@ -455,8 +469,15 @@ export function drawText(ctx, W, H, tx0, t) {
     remaining -= [...line].length;
     const y = top + i * m.lh;
     // 文字送りでも位置がぶれないよう、全文の幅で左端をそろえる
-    const x = s === line ? m.cx : m.cx - m.widths[i] / 2 + ctx.measureText(s).width / 2;
-    drawLine(s, x, y);
+    // 行そろえ（left / right は、いちばん長い行の端に合わせる）
+    const bw = Math.max(...m.widths);
+    const lx = tx.align === 'left' ? m.cx - bw / 2 : tx.align === 'right' ? m.cx + bw / 2 - m.widths[i] : m.cx - m.widths[i] / 2;
+    const done = s === line && remaining >= 0;
+    // 打っている途中はカーソルを付ける（cursor: true か、好きな文字）
+    const cur = tx.anim === 'typewriter' && tx.cursor && (!done || Math.floor(t * 2.5) % 2 === 0) ? (tx.cursor === true ? '▌' : tx.cursor) : '';
+    const sw = ctx.measureText(s).width;
+    drawLine(s, lx + sw / 2, y);
+    if (cur && (!done ? true : i === m.lines.length - 1)) { const cw = ctx.measureText(cur).width; const keep = ctx.globalAlpha; ctx.globalAlpha = keep * 0.9; drawLine(cur, lx + sw + cw / 2, y); ctx.globalAlpha = keep; }
   });
   ctx.restore();
 }
