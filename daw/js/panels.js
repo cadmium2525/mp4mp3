@@ -27,6 +27,18 @@ export const FX_PARAMS = {
   crush: [['bits', 'ビット', 2, 16, 1, 8, num], ['rate', '間引き', 1, 32, 1, 4, num], ['mix', '量', 0, 1, 0.01, 1, pct]],
   gain: [['db', '音量', -24, 24, 0.5, 0, db]],
   limiter: [['ceiling', '上限', -12, 0, 0.1, -1, db]],
+  phaser: [['mix', '量', 0, 1, 0.01, 0.5, pct], ['rate', '速さ', 0.05, 8, 0.05, 0.5, (v) => `${v.toFixed(2)}Hz`], ['depth', '深さ', 0, 1, 0.01, 0.7, pct], ['feedback', 'くせ', 0, 0.95, 0.01, 0.5, pct]],
+  flanger: [['mix', '量', 0, 1, 0.01, 0.5, pct], ['rate', '速さ', 0.05, 8, 0.05, 0.3, (v) => `${v.toFixed(2)}Hz`], ['feedback', 'くせ', 0, 0.95, 0.01, 0.5, pct]],
+  vibrato: [['rate', '速さ', 0.5, 12, 0.1, 5, (v) => `${v.toFixed(1)}Hz`], ['depth', '深さ', 0, 1, 0.01, 0.3, pct]],
+  autopan: [['depth', '深さ', 0, 1, 0.01, 0.8, pct]],
+  autofilter: [['mix', '量', 0, 1, 0.01, 1, pct], ['freq', '中心', 100, 8000, 10, 800, hz], ['range', '動く幅（オクターブ）', 0, 5, 0.1, 2.5, num], ['q', 'クセ（Q）', 0.3, 12, 0.1, 2, num]],
+  ringmod: [['freq', '周波数', 20, 4000, 10, 440, hz], ['mix', '量', 0, 1, 0.01, 0.5, pct]],
+  exciter: [['amount', '量', 0, 1, 0.01, 0.4, pct], ['freq', 'ここから上を足す', 1500, 10000, 100, 4000, hz]],
+  multiband: [['threshold', 'しきい値', -40, 0, 0.5, -20, db], ['ratio', '比率', 1, 10, 0.5, 3, (v) => `${v}:1`], ['mix', '量', 0, 1, 0.01, 1, pct]],
+  shimmer: [['mix', '量', 0, 1, 0.01, 0.3, pct], ['decay', '長さ', 0.5, 10, 0.1, 4, sec]],
+  gate: [['depth', '深さ', 0, 1, 0.01, 1, pct], ['duty', '開いている割合', 0.1, 1, 0.01, 0.6, pct], ['mix', '量', 0, 1, 0.01, 1, pct]],
+  stutter: [['mix', '量', 0, 1, 0.01, 1, pct]],
+  tapestop: [['time', '止まるまで', 0.1, 4, 0.05, 1, sec]],
 };
 const FX_DEFAULT_EXTRA = {
   eq: { bands: [{ type: 'hp', freq: 80 }, { type: 'peak', freq: 400, gain: -2, q: 1 }, { type: 'highshelf', freq: 8000, gain: 2 }] },

@@ -1,11 +1,11 @@
 /* かなでる：オフラインでも開けるようにアプリ本体をキャッシュ（ネット優先） */
-const CACHE = 'kanaderu-v1';
+const CACHE = 'kanaderu-v2';
 const ASSETS = [
   './', 'index.html', 'css/daw.css', 'manifest.webmanifest',
   'js/app.js', 'js/ui.js', 'js/store.js', 'js/player.js', 'js/worker.js', 'js/mp3worker.js', 'js/templates.js',
   'js/arrange.js', 'js/roll.js', 'js/panels.js', 'js/mixer.js', 'js/scope.js', 'js/sfxstudio.js',
   'js/engine/dsp.js', 'js/engine/fx.js', 'js/engine/instruments.js', 'js/engine/presets.js', 'js/engine/levels.js', 'js/engine/sfx.js',
-  'js/engine/song.js', 'js/engine/mix.js', 'js/engine/analyze.js', 'js/engine/viz.js', 'js/engine/wav.js', 'js/engine/validate.js',
+  'js/engine/song.js', 'js/engine/mix.js', 'js/engine/arranger.js', 'js/engine/analyze.js', 'js/engine/viz.js', 'js/engine/wav.js', 'js/engine/validate.js',
   '../lib/lame.min.js',
   'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
 ];

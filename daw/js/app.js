@@ -11,6 +11,7 @@ import { renderArrange, updatePlayhead, initArrange } from './arrange.js';
 import { renderMixer, updateMeters } from './mixer.js';
 import { renderViz, tickViz } from './scope.js';
 import { openSfxStudio } from './sfxstudio.js';
+import { STYLES } from './engine/arranger.js';
 
 /* ---------------- 状態 ---------------- */
 
@@ -232,6 +233,11 @@ function songSettings() {
     slider({ label: '共有リバーブの長さ', min: 0.5, max: 6, step: 0.1, value: s.sends?.reverb?.decay ?? 2.2, fmt: (v) => `${v.toFixed(1)} 秒`, onChange: (v) => commit((x) => { x.sends = { ...(x.sends || {}), reverb: { ...(x.sends?.reverb || {}), decay: v } }; }) }),
     el('div', { class: 'field' }, [el('div', { class: 'lbl' }, 'ディレイの間隔'), seg([['1/8', '8分'], ['1/8d', '付点8分'], ['1/4', '4分'], ['1/16', '16分']], s.sends?.delay?.time ?? '1/8d', (v) => commit((x) => { x.sends = { ...(x.sends || {}), delay: { ...(x.sends?.delay || {}), time: v } }; }))]),
     el('div', { class: 'field' }, [el('div', { class: 'lbl' }, 'ループ再生の範囲（小節）'), loopEditor()]),
+    el('div', { class: 'field' }, [el('div', { class: 'lbl' }, '動画の長さに合わせる'), el('button', { class: 'btn', type: 'button', onclick: async () => {
+      const sec = Number(prompt('曲の長さ（秒）。余韻まで含めてちょうどこの長さにします', '60'));
+      if (!(sec > 0)) return;
+      try { const m = await call('fit', { song: S.song, seconds: sec }); commit((x) => { const id = x.id; for (const k of Object.keys(x)) delete x[k]; Object.assign(x, m.song, { id }); }); closeSheet(); toast(`${sec} 秒に合わせました`); } catch (ex) { toast(ex.message, 4000); }
+    } }, '秒数を指定して合わせる')]),
   ]);
 }
 
@@ -300,6 +306,41 @@ async function importJsonHome() {
   } }, '作成')], { tall: true });
 }
 
+/* ---------------- おまかせ作曲 ---------------- */
+
+function composeSheet() {
+  const o = { style: 'pop', seconds: 60, seed: Math.floor(Math.random() * 9999) + 1, energy: 0.6, loop: false };
+  const grid = el('div', { class: 'presets' }, STYLES.map((st) => el('button', { type: 'button', 'aria-pressed': String(st.id === o.style), title: st.desc, onclick: (e) => {
+    o.style = st.id;
+    for (const b of grid.children) b.setAttribute('aria-pressed', 'false');
+    e.currentTarget.setAttribute('aria-pressed', 'true');
+    desc.textContent = st.desc || '';
+  } }, st.label)));
+  const desc = el('p', { class: 'note' }, STYLES.find((x) => x.id === o.style)?.desc || '');
+  const err = el('div', { class: 'err' });
+  openSheet('おまかせ作曲', [
+    grid, desc,
+    slider({ label: '長さ', min: 10, max: 240, step: 1, value: o.seconds, fmt: (v) => `${v} 秒`, onChange: (v) => (o.seconds = v) }),
+    slider({ label: '盛り上がり', min: 0, max: 1, step: 0.05, value: o.energy, fmt: (v) => `${Math.round(v * 100)}%`, onChange: (v) => (o.energy = v) }),
+    el('div', { class: 'field' }, [el('div', { class: 'lbl' }, '終わり方'), seg([[false, 'きちんと終わる'], [true, 'ループ用（つなぎ目なし）']], o.loop, (v) => (o.loop = v))]),
+    el('p', { class: 'note' }, '長さは余韻まで含めてちょうどその秒数になります（動画の長さに合わせられます）。作ったあと、和音・楽器・音符は自由に直せます。'),
+    err,
+    el('button', { class: 'btn primary wide', type: 'button', onclick: async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true; b.textContent = '作曲中…';
+      try {
+        const m = await call('compose', { opts: { ...o } });
+        const song = m.song;
+        song.version = 1;
+        song.id = Math.random().toString(36).slice(2, 10);
+        await store.put({ id: song.id, name: song.name, song });
+        closeSheet();
+        openSong(song.id, song);
+      } catch (ex) { err.textContent = ex.message; b.disabled = false; b.textContent = '作曲する'; }
+    } }, '作曲する'),
+  ], { tall: true });
+}
+
 /* ---------------- 書き出し ---------------- */
 
 function exportSheet() {
@@ -345,6 +386,7 @@ function bind() {
   $('#sheetBackdrop').onclick = closeSheet;
   $('#importJson').onclick = importJsonHome;
   $('#openSfx').onclick = () => openSfxStudio({ back: renderHome });
+  $('#openCompose').onclick = composeSheet;
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, textarea, select')) return;
     if (e.code === 'Space' && !$('#song').hidden) { e.preventDefault(); togglePlay(); }

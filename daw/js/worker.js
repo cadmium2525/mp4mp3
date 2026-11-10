@@ -13,6 +13,7 @@ import { encodeWav } from './engine/wav.js';
 import { validateSong } from './engine/validate.js';
 import { beatsPerBar } from './engine/song.js';
 import { dbToGain } from './engine/dsp.js';
+import { compose, fitToLength } from './engine/arranger.js';
 
 const cache = new Map(); // トラックの描画結果の使い回し（編集していないトラックは計算しない）
 
@@ -83,6 +84,10 @@ function handle(m) {
       const bytes = encodeWav(m.L, m.R, m.sr, m.bits || 24);
       return post({ type: 'done', id: m.id, bytes }, [bytes.buffer]);
     }
+    case 'compose':
+      return post({ type: 'done', id: m.id, song: compose(m.opts || {}) });
+    case 'fit':
+      return post({ type: 'done', id: m.id, song: fitToLength(m.song, m.seconds) });
     case 'validate':
       return post({ type: 'done', id: m.id, ...validateSong(m.song) });
     default:

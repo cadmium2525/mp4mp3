@@ -262,3 +262,5 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22p
   .presets { grid-template-columns: repeat(6, 1fr); }
   :root { --hdr: 150px; }
 }
+.compose-entry { background: linear-gradient(135deg, #2a2440, #1a1d2b); border-color: #4a3f7a; margin-top: 8px; }
+.compose-entry .sfx-ico { background: #b79cff; }

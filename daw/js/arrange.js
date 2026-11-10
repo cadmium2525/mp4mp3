@@ -9,6 +9,7 @@ import { INST_PRESETS, KITS } from './engine/presets.js';
 import { SFX_PRESETS } from './engine/sfx.js';
 import { openClipEditor } from './roll.js';
 import { openTrackSettings, pickInstrument, openSfxClip } from './panels.js';
+import { genLabel, bakeClip, GEN_INFO } from './engine/arranger.js';
 
 const HDR = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hdr')) || 112;
 
@@ -111,7 +112,7 @@ function clipEl(song, tr, ti, c, ci, color) {
   const len = clipLen(song, c);
   const sel = S.sel && S.sel.t === ti && S.sel.c === ci;
   const x = (c.at ?? 0) * S.ppb, w = Math.max(8, len * S.ppb - 2);
-  const label = c.sfx ? (SFX_PRESETS[c.sfx.preset]?.label || '効果音') : c.pattern ? `${c.pattern}${c.repeat > 1 ? ` ×${c.repeat}` : ''}` : c.repeat > 1 ? `×${c.repeat}` : '';
+  const label = c.gen ? genLabel(c.gen) : c.sfx ? (SFX_PRESETS[c.sfx.preset]?.label || '効果音') : c.pattern ? `${c.pattern}${c.repeat > 1 ? ` ×${c.repeat}` : ''}` : c.repeat > 1 ? `×${c.repeat}` : '';
   const cv = el('canvas');
   const d = el('div', { class: `clip${sel ? ' sel' : ''}`, style: { left: `${x}px`, width: `${w}px`, '--tc': color } }, [cv, el('span', { class: 'cl' }, label)]);
   requestAnimationFrame(() => drawClip(cv, song, tr, c, len, color));
@@ -178,8 +179,29 @@ function drawClip(cv, song, tr, c, len, color) {
   });
 }
 
+/** 自動クリップ：種類・シードを変える、または音符に変換して編集する */
+function openGenClip(ti, ci) {
+  const clip = S.song.tracks[ti].clips[ci], g = clip.gen, info = GEN_INFO[g.type];
+  const key = g.type === 'arp' ? 'pattern' : g.type === 'melody' ? 'contour' : 'style';
+  const up = (fn) => commit((s) => fn(s.tracks[ti].clips[ci].gen));
+  const sel = el('select', { onchange: (e) => up((x) => { x[key] = e.target.value; }) }, info.styles.map(([v, l]) => el('option', { value: v, selected: v === (g[key] ?? info.styles[0][0]) }, l)));
+  openSheet(genLabel(g), [
+    el('p', { class: 'note' }, 'このクリップは、和音トラックに合わせて自動で演奏を作ります。和音を変えると演奏も変わります。'),
+    el('div', { class: 'field' }, [el('label', {}, '演奏のしかた'), sel]),
+    el('div', { class: 'row' }, [
+      el('button', { class: 'btn', type: 'button', onclick: () => { up((x) => { x.seed = Math.floor(Math.random() * 9999) + 1; }); toast('別のパターンにしました'); } }, '🎲 別のパターン'),
+      el('button', { class: 'btn primary', type: 'button', onclick: () => {
+        commit((s) => { s.tracks[ti].clips[ci] = bakeClip(s, s.tracks[ti], s.tracks[ti].clips[ci]); });
+        closeSheet();
+        openClipEditor(ti, ci);
+      } }, '音符に変換して編集'),
+    ]),
+  ]);
+}
+
 function openClip(ti, ci) {
   const tr = S.song.tracks[ti];
+  if (tr.clips[ci]?.gen) return openGenClip(ti, ci);
   if (trackType(tr) === 'sfx') return openSfxClip(ti, ci);
   openClipEditor(ti, ci);
 }
