@@ -45,6 +45,7 @@ export function newProject(preset = 'shorts') {
     overlays: [],
     motions: [],
     shapes: [],
+    gens: [],
     effects: [],
     updatedAt: Date.now(),
   };
@@ -133,6 +134,35 @@ export function newMotion(ref, start = 0, cycle = 4.7, opts = {}) {
     rx: 0,
     ry: 0,
     anim: 'none',
+    loop: 'none',
+    keys: null,
+    ease: 'ease',
+    ...opts,
+  };
+}
+
+/** ジェネレーター（コードで描く映像）。x, y は中心、w, h は画面に対する割合（既定は全画面） */
+export function newGen(type, start = 0, opts = {}) {
+  return {
+    id: uid('g'),
+    type,
+    start,
+    end: start + 5,
+    x: 0.5,
+    y: 0.5,
+    w: 1,
+    h: 1,
+    z: 'mid',
+    opacity: 1,
+    blend: 'normal',
+    rotation: 0,
+    scale: 1,
+    rx: 0,
+    ry: 0,
+    speed: 1,
+    seed: 1,
+    params: {},
+    anim: 'fade',
     loop: 'none',
     keys: null,
     ease: 'ease',
@@ -252,6 +282,7 @@ export function projectDuration(project, layout = layoutClips(project)) {
   for (const s of project.shapes || []) d = Math.max(d, s.end);
   for (const o of project.overlays || []) d = Math.max(d, overlayEnd(o));
   for (const m of project.motions || []) d = Math.max(d, m.end);
+  for (const g of project.gens || []) d = Math.max(d, g.end);
   for (const e of project.effects || []) d = Math.max(d, e.end);
   if (!d) {
     for (const a of project.audios) d = Math.max(d, a.start + (a.out - a.in));
@@ -365,6 +396,7 @@ export function normalizeProject(p) {
   proj.shapes = (p.shapes || []).map((x) => newShape(x.start ?? 0, x.kind || 'round', defined(x)));
   proj.effects = (p.effects || []).map((x) => newEffect(x.start ?? 0, x.type || 'flash', defined(x)));
   proj.motions = (p.motions || []).map((m) => newMotion(m.ref ?? '001', m.start ?? 0, 4.7, defined(m)));
+  proj.gens = (p.gens || []).map((g) => newGen(g.type, g.start ?? 0, defined(g)));
   proj.overlays = (p.overlays || []).map((o) => {
     const m = proj.media[o.media] || { id: o.media, kind: 'video', duration: o.out ?? 3 };
     return newOverlay({ id: o.media, ...m }, o.start ?? 0, defined(o));

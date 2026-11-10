@@ -8,11 +8,11 @@ import { applyCutout } from './cutout.js';
 import { draw3D, layerCanvas } from './warp3d.js';
 import { drawMotionElement, motionBox, element as motionElement } from './motionlib.js';
 
-export const FONTS = {
-  gothic: { family: '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif', weight: 900 },
-  rounded: { family: '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif', weight: 800 },
-  mincho: { family: '"Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif', weight: 700 },
-};
+import { FONTS } from './fonts.js';
+import { drawGen } from './gens/index.js';
+import './gens/all.js';
+import { applyPost } from './post.js';
+export { FONTS };
 
 let filterSupported = null;
 function supportsFilter(ctx) {
@@ -56,6 +56,9 @@ export function drawFrame(ctx, project, layout, t, getSource, opts = {}) {
   ctx.fillStyle = project.background || '#000';
   ctx.fillRect(0, 0, W, H);
 
+  const gens = project.gens || [];
+  for (const g of gens) if (g.z === 'back') drawGen(ctx, W, H, g, t, opts);
+
   for (const item of activeClipsAt(layout, t)) {
     const { L } = item;
     const mt = mediaTime(L, t);
@@ -86,6 +89,8 @@ export function drawFrame(ctx, project, layout, t, getSource, opts = {}) {
 
   const effects = project.effects || [];
   applyEffects(ctx, W, H, effects, t, 'video');
+  applyPost(ctx, W, H, effects, t, 'video', opts.audio);
+  for (const g of gens) if ((g.z || 'mid') === 'mid') drawGen(ctx, W, H, g, t, opts);
   for (const o of project.overlays || []) drawOverlay(ctx, W, H, o, t, getSource, opts);
   for (const m of project.motions || []) drawMotion(ctx, W, H, m, t);
   for (const s of project.shapes || []) with3D(ctx, W, H, s, t, (c) => drawShape(c, W, H, s, t), () => shapeBox(W, H, s, t));
@@ -93,7 +98,9 @@ export function drawFrame(ctx, project, layout, t, getSource, opts = {}) {
     if (tx.id === opts.hideTextId) continue;
     with3D(ctx, W, H, tx, t, (c) => drawText(c, W, H, tx, t), () => textBounds(ctx, W, H, tx, t));
   }
+  for (const g of gens) if (g.z === 'top') drawGen(ctx, W, H, g, t, opts);
   applyEffects(ctx, W, H, effects, t, 'top');
+  applyPost(ctx, W, H, effects, t, 'all', opts.audio);
   ctx.restore();
 }
 
