@@ -3,6 +3,7 @@
  * 時間はすべて「拍」（4分音符 = 1）。秒への換算は bpm から。
  */
 import { pitchesOf, rng, hashSeed, noteToMidi } from './dsp.js';
+import { expandGen } from './arranger.js';
 
 export const SR = 48000;
 
@@ -55,11 +56,17 @@ function contentLen(notes) {
 /**
  * トラックの全クリップを展開して、拍単位の音符の列にする。
  * clip: { at, notes?, grid?, res?, pattern?, len?, repeat?, transpose?, vel?, swing? }
+ * clip.gen があれば自動クリップ：和音トラック（song.chords）を見て、その範囲の音符をその場で作る。
  */
 export function trackNotes(song, track) {
   const out = [];
   for (let clip of track.clips || []) {
     if (clip.mute) continue;
+    if (clip.gen) {
+      // 自動クリップ（スウィングは作るときに済ませてあるので、ここでは足さない）
+      for (const nt of expandGen(song, track, clip)) out.push({ ...nt, t: (clip.at ?? 0) + nt.t, v: nt.v * (clip.vel ?? 1), tr: clip.transpose ?? 0 });
+      continue;
+    }
     let notes = [];
     if (clip.pattern) {
       const p = song.patterns?.[clip.pattern];

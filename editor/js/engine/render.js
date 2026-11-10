@@ -57,6 +57,7 @@ export function drawFrame(ctx, project, layout, t, getSource, opts = {}) {
   ctx.fillRect(0, 0, W, H);
 
   const gens = project.gens || [];
+  if (gens.length) opts = { ...opts, project };
   for (const g of gens) if (g.z === 'back') drawGen(ctx, W, H, g, t, opts);
 
   for (const item of activeClipsAt(layout, t)) {

@@ -16,13 +16,13 @@ const MOTION_MAX = 120; // Motion Prompt の要素数（取り込み時点）
 const KEYS = {
   top: ['version', 'id', 'name', 'width', 'height', 'fps', 'background', 'fadeOut', 'media', 'clips', 'texts', 'audios', 'overlays', 'motions', 'shapes', 'gens', 'effects', 'motionBlur', 'updatedAt'],
   motion: ['id', 'ref', 'start', 'end', 'x', 'y', 'w', 'cover', 'mode', 'hold', 'speed', 'offset', 'transparent', 'colors', 'opacity', 'rotation', 'scale', 'rx', 'ry', 'perspective', 'anim', 'animOut', 'loop', 'keys', 'to', 'ease'],
-  media: ['id', 'name', 'kind', 'duration', 'width', 'height', 'hasAudio', 'silences'],
+  media: ['id', 'name', 'kind', 'duration', 'width', 'height', 'hasAudio', 'silences', 'gen'],
   clip: ['id', 'media', 'in', 'out', 'speed', 'volume', 'fit', 'zoom', 'x', 'y', 'kenburns', 'filter', 'transition', 'cutout'],
   text: ['id', 'text', 'start', 'end', 'style', 'font', 'color', 'stroke', 'strokeWidth', 'strokes', 'bg', 'shadow', 'glow', 'extrude', 'size', 'x', 'y', 'anim', 'animOut', 'opacity', 'rotation', 'scale', 'rx', 'ry', 'perspective', 'to', 'keys', 'ease'],
   shape: ['id', 'kind', 'start', 'end', 'x', 'y', 'w', 'h', 'rotation', 'fill', 'stroke', 'strokeWidth', 'radius', 'opacity', 'shadow', 'anim', 'animOut', 'loop', 'scale', 'rx', 'ry', 'perspective', 'to', 'keys', 'ease'],
   overlay: ['id', 'media', 'start', 'in', 'out', 'speed', 'volume', 'x', 'y', 'w', 'rotation', 'opacity', 'scale', 'rx', 'ry', 'perspective', 'mask', 'radius', 'border', 'borderColor', 'shadow', 'anim', 'animOut', 'loop', 'keys', 'to', 'ease', 'cutout'],
   effect: ['id', 'type', 'start', 'end', 'intensity', 'params', 'on', 'react', 'keys', 'to', 'ease', 'scale', 'x', 'y', 'rotation'],
-  audio: ['id', 'media', 'start', 'in', 'out', 'volume', 'fadeIn', 'fadeOut', 'loop'],
+  audio: ['id', 'media', 'start', 'in', 'out', 'volume', 'fadeIn', 'fadeOut', 'loop', 'sfx', 'song', 'auto'],
 };
 
 export function validateProject(p) {
@@ -85,7 +85,7 @@ export function validateProject(p) {
 
   for (const [id, m] of Object.entries(media)) {
     unknown(m, 'media', `media.${id}`);
-    if (!m.name) err(`media.${id}`, 'name（ファイル名）が必要です');
+    if (!m.name && !m.gen) err(`media.${id}`, 'name（ファイル名）か gen（かなでるで作る音）が必要です');
   }
   (p.clips || []).forEach((c, i) => {
     const path = `clips[${i}]`;
@@ -159,7 +159,7 @@ export function validateProject(p) {
   (p.audios || []).forEach((a, i) => {
     const path = `audios[${i}]`;
     unknown(a, 'audio', path);
-    mediaRef(a.media, `${path}.media`);
+    if (!a.sfx && !a.song) mediaRef(a.media, `${path}.media`);
     num(a.start, `${path}.start`, { min: 0 });
     num(a.volume, `${path}.volume`, { min: 0, max: 4 });
   });

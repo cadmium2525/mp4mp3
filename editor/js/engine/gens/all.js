@@ -2,3 +2,4 @@
 import './particles.js';
 import './fluid.js';
 import './shaders.js';
+import './audio.js';

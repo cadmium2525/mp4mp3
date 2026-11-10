@@ -8,6 +8,8 @@ import { loadCutout } from './cutout.js';
 import { ensureMotions } from './motionlib.js';
 import { drawFrame, loadFonts } from './render.js';
 import { mixdown } from './audio.js';
+import { AudioFeatures, needsAudio } from './audiofeat.js';
+import { GENS } from './gens/index.js';
 
 export const QUALITIES = {
   standard: { label: '標準', bitrate: MB.QUALITY_MEDIUM },
@@ -61,6 +63,11 @@ export async function exportVideo(project, lib, opts = {}) {
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d', { alpha: false });
+  // モーションブラー（project.motionBlur か opts.motionBlur：重ねる枚数。0 でなし）
+  const blurN = Math.max(1, Math.min(16, Math.round(opts.motionBlur ?? project.motionBlur ?? 0)));
+  const shutter = 0.6;
+  let sub = null, sctx = null;
+  if (blurN > 1) { sub = document.createElement('canvas'); sub.width = width; sub.height = height; sctx = sub.getContext('2d', { alpha: false }); }
 
   const output = new MB.Output({
     format: new MB.Mp4OutputFormat({ fastStart: 'in-memory' }),
@@ -81,8 +88,10 @@ export async function exportVideo(project, lib, opts = {}) {
 
   let readers = null;
   try {
-    // 音声：使う素材をデコードしてミックス
-    if (audioSource) {
+    // 音声：使う素材をデコードしてミックス（音に連動する映像がある場合は、その解析にも使う）
+    let features = null;
+    const wantFeatures = needsAudio(proj, GENS);
+    if (audioSource || wantFeatures) {
       onProgress(0, '音声を準備中…');
       const ids = new Set();
       for (const L of layout) if (L.clip.volume > 0) ids.add(L.clip.media);
@@ -95,8 +104,8 @@ export async function exportVideo(project, lib, opts = {}) {
       }
       const mixed = await mixdown(proj, layout, (id) => bufs.get(id) || null, 48000);
       bufs.clear();
-      await audioSource.add(mixed);
-      audioSource.close();
+      if (wantFeatures) features = new AudioFeatures(mixed.getChannelData(0), mixed.numberOfChannels > 1 ? mixed.getChannelData(1) : null, 48000);
+      if (audioSource) { await audioSource.add(mixed); audioSource.close(); }
     }
 
     // 映像：クリップごとに必要なフレームの時刻を先に並べておくと、デコードが1回で済む
@@ -130,7 +139,17 @@ export async function exportVideo(project, lib, opts = {}) {
         srcs.set(it.L.clip.id, await readers.get(it.L.clip.id).next());
       }
       for (const o of activeOverlays(proj, t)) srcs.set(o.id, await readers.get(o.id).next());
-      drawFrame(ctx, proj, layout, t, (L) => srcs.get(L.clip.id));
+      const getSrc = (L) => srcs.get(L.clip.id);
+      if (blurN > 1) {
+        // モーションブラー：1 コマの間を細かく刻んで描き、重ねて平均する（速い動きがなめらかに流れる）
+        for (let i = 0; i < blurN; i++) {
+          const ts = Math.max(0, t + ((i + 0.5) / blurN - 0.5) * shutter / fps);
+          drawFrame(sctx, proj, layout, ts, getSrc, { audio: features });
+          ctx.globalAlpha = 1 / (i + 1);
+          ctx.drawImage(sub, 0, 0);
+        }
+        ctx.globalAlpha = 1;
+      } else drawFrame(ctx, proj, layout, t, getSrc, { audio: features });
       await videoSource.add(t, 1 / fps);
       if (k % 5 === 0) onProgress(k / frames, `書き出し中… ${Math.round((k / frames) * 100)}%`);
     }

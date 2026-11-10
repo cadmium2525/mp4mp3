@@ -17,13 +17,19 @@ import { exportVideo } from './js/engine/exporter.js';
 import { drawFrame, loadFonts } from './js/engine/render.js';
 import { loadCutout } from './js/engine/cutout.js';
 import { ensureMotions } from './js/engine/motionlib.js';
+import { synthFile, expandGenerated } from './js/engine/synth.js';
+import { mixdown } from './js/engine/audio.js';
+import { AudioFeatures, needsAudio } from './js/engine/audiofeat.js';
+import { GENS } from './js/engine/gens/index.js';
 
 async function load(projectJson) {
-  const project = { ...projectJson, media: { ...projectJson.media } };
+  const project = expandGenerated({ ...projectJson, media: { ...projectJson.media } });
   const files = [...document.getElementById('files').files];
   const lib = new MediaLibrary();
   for (const [id, m] of Object.entries(project.media)) {
-    const f = files.find((x) => x.name === m.name);
+    let f = files.find((x) => x.name === m.name);
+    // かなでるのエンジンで作る音（効果音・曲）
+    if (!f && m.gen) { console.log('progress', 0, `音を作成中… ${m.gen.sfx?.preset || m.gen.song?.name || ''}`); f = await synthFile(m.gen, m.name || `${id}.wav`); }
     if (!f) throw new Error(`素材が見つかりません: ${m.name}`);
     const meta = await lib.add(f, id);
     // 手書き JSON では kind/duration 等を省略できる（実ファイルから補う）
@@ -57,7 +63,21 @@ async function frameAt(project, lib, layout, t, ctx) {
   for (const o of project.overlays) {
     if (t >= o.start && t < overlayEnd(o)) await get(o.id, o.media, Math.min(o.out, o.in + (t - o.start) * (o.speed || 1)));
   }
-  drawFrame(ctx, project, layout, t, (L) => srcs.get(L.clip.id));
+  drawFrame(ctx, project, layout, t, (L) => srcs.get(L.clip.id), { audio: await featuresOf(project, lib, layout) });
+}
+
+/** 音に連動する映像がある場合だけ、音声をミックスして解析する（1 回だけ） */
+let featCache = null;
+async function featuresOf(project, lib, layout) {
+  if (!needsAudio(project, GENS)) return null;
+  if (featCache && featCache.project === project) return featCache.f;
+  const ids = new Set([...project.clips.map((c) => c.media), ...project.audios.map((a) => a.media), ...project.overlays.map((o) => o.media)]);
+  const bufs = new Map();
+  for (const id of ids) bufs.set(id, await lib.decodeAudio(id, 48000).catch(() => null));
+  const mixed = await mixdown(project, layout, (id) => bufs.get(id) || null, 48000);
+  const f = new AudioFeatures(mixed.getChannelData(0), mixed.numberOfChannels > 1 ? mixed.getChannelData(1) : null, 48000);
+  featCache = { project, f };
+  return f;
 }
 
 window.renderProject = async (projectJson, opts = {}) => {

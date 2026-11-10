@@ -163,7 +163,7 @@ export function drawGen(ctx, W, H, g0, t, opts = {}) {
   const seed = g0.seed ?? 1;
   const c = {
     item: g, p: { ...def.defaults, ...(g0.params || {}) }, t: local, T: t, dur: (itemEnd(g0) - g0.start) * (g0.speed ?? 1),
-    W: rw, H: rh, seed, colors: paletteOf(g0, def), audio: opts.audio || null, state: st.data, preview: !!opts.preview, q,
+    W: rw, H: rh, seed, colors: paletteOf(g0, def), audio: opts.audio || null, project: opts.project || null, state: st.data, preview: !!opts.preview, q,
     rnd: (i, k = 0) => rnd(i, k, seed),
     pending: false,
     /** 状態つきシミュレーションを c.t まで進める。戻り値は状態 */
