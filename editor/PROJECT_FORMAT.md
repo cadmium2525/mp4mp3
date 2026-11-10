@@ -315,3 +315,65 @@ node editor/tools/render.mjs project.json 素材フォルダ sheet.png --sheet 1
 render.mjs は書き出し前に自動でチェックし、エラーがあれば止まります。アプリの「JSONを貼り付け」でも同じチェックが働きます。
 
 Chromium が H.264 に対応していない環境では VP9/Opus で書き出され、ffmpeg があれば自動で H.264/AAC の MP4 に変換されます。
+
+## ジェネレーター（gens）— コードで描く映像
+
+素材を使わず、計算だけで描く映像です。`x, y` は中心、`w, h` は画面に対する割合（既定は全画面）。
+
+```jsonc
+{ "type": "particletext", "start": 0, "end": 6, "params": { "text": "TSUNAGU", "size": 0.3 },
+  "x": 0.5, "y": 0.5, "w": 1, "h": 1,
+  "z": "mid",            // back（映像の後ろ）/ mid（映像の上）/ top（文字の上）
+  "blend": "add",        // normal / add / screen / multiply / overlay / lighten …
+  "palette": "neon",     // または "colors": ["#ff7a3d", "#4c86ff"]
+  "seed": 3, "speed": 1, "opacity": 1,
+  "mask": { "text": "流体", "size": 0.5 },     // 文字（または shape: circle/round）の内側だけ見せる
+  "react": { "src": "kick", "prop": "scale", "amount": 0.12 },   // 音に反応（kick/bass/mid/high/level）
+  "keys": [ ... ], "anim": "fade" }
+```
+
+| 分類 | type | 主な params |
+| --- | --- | --- |
+| 主役級 | `attractor`（カオス） | kind（lorenz/aizawa/thomas/halvorsen/dadras/rossler/chen）drawDur rotate tilt zoom glow colorBy |
+| | `galaxy`（銀河の衝突） | count speed mass distance tilt zoom glow stars |
+| | `fluid`（流体・インク） | text（文字から始める）textSize hold emitters force swirl fade bright shade |
+| | `fractal`（3D フラクタル） | kind（mandelbulb/mandelbox/julia）power morph rotate tilt zoom detail |
+| 文字 | `particletext`（粒子の文字） | text font size count inDur outDur swirl glow mode（assemble/burst/rain）colorBy |
+| | `text3d`（立体の文字） | text font depth camera（dolly/orbit/rise/flyby/still）camDur reflect emissive zoom |
+| 音の可視化 | `spectrum` `wave` `radial` | style bars mirror … （動画の音のミックスに合わせて動く） |
+| | `pianoroll` | song（かなでるの曲 JSON）または media（生成した曲の ID）window playhead offset |
+| 背景 | `aurora` `stars` `plexus` `grid` | soft dark / count warp / count reach / speed sun |
+| グラフ | `chart` | kind（bar/line/area/pie/hbar）data labels title unit highlight growDur stagger showValues max |
+
+配色（palette）：fire ocean neon sunset aurora candy ember ice mono gold forest duo。
+
+## 仕上げのエフェクト（GPU）
+
+`effects` に次の type が増えました。`intensity` が強さ、`params` に細かい設定、`"on": "video"` で映像だけ（文字や図形を除く）にかけ、
+`"react": { "src": "kick", "amount": 1 }` で音に合わせて強さが変わります。
+
+`bloom`（光のにじみ：threshold radius）`grade`（色あい：preset = cinematic / warm / cool / vivid / fade / noir / dream / cyber / sepia）
+`chroma` `lens` `zoomblur` `dirblur`（angle）`tiltshift`（focus band）`shockwave`（cx cy。区間の長さで広がる）`ripple` `godrays`（cx cy）
+`lightleak` `scanlines` `vhs` `halftone` `pixelate` `kaleido`（sides）`mirror` `edge`（color）`duotone`（colorA colorB）`hue` `posterize` `invert` `sharpen`
+`camera`（カメラワーク：`keys` で `scale`（ズーム）`x` `y`（移動）`rotation` を動かす）
+
+## テキストの追加機能
+
+- `"count": { "from": 0, "to": 12800, "dur": 2, "decimals": 0 }`：数字が増えていく。`text` の `{n}` が数字に置き換わる（例 `"売上 {n} 万円"`）
+- `"anim": "typewriter"` に `"typeSpeed": 14`（1 秒あたりの文字数）と `"cursor": true`（カーソル）
+- `"align": "left" | "right"`、`"font": "mono"`（等幅）/ `"thin"`（細字）
+
+## 音：かなでるのエンジンで作る（素材ファイル不要）
+
+```jsonc
+"audios": [
+  { "song": { ...かなでるの曲 JSON... }, "start": 0, "volume": 0.5 },      // BGM をその場で合成
+  { "sfx": { "preset": "whoosh", "length": 1.2 }, "start": 3.2, "volume": 0.6 }   // 効果音
+]
+```
+
+`media` に `{ "bgm": { "gen": { "song": {...} } } }` と書いて `audios` から `"media": "bgm"` で参照してもかまいません（`pianoroll` から参照できます）。
+曲の形式・効果音プリセットは [../daw/FORMAT.md](../daw/FORMAT.md)。動画の長さに合う曲は `node daw/tools/compose.mjs --style corporate --seconds 45 out.json` で作れます。
+
+- 効果音の自動付け：`node editor/tools/autosfx.mjs project.json out.json`（文字や図形の出現・切り替え・エフェクトに合わせて `audios` に追加。アプリでは「音楽・音」→「効果音を自動で付ける」）
+- モーションブラー：プロジェクトに `"motionBlur": 8`（1 コマを 8 回に刻んで重ねる。0 でなし）

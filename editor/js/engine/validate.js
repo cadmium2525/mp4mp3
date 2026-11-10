@@ -5,6 +5,8 @@
 import { TRANSITIONS, TEXT_STYLES } from './project.js';
 import { SHAPES, EFFECTS, EASINGS, ANIM_PROPS, GRADIENTS } from './fx.js';
 import './post.js'; // 仕上げエフェクトを EFFECTS に登録
+import { GENS, PALETTES, BLENDS } from './gens/index.js';
+import './gens/all.js';
 
 const ANIM_TEXT = ['none', 'fade', 'pop', 'slide', 'typewriter'];
 const ANIM_SHAPE = ['none', 'fade', 'pop', 'slide', 'spin', 'wipe'];
@@ -21,6 +23,7 @@ const KEYS = {
   text: ['id', 'text', 'start', 'end', 'style', 'font', 'color', 'stroke', 'strokeWidth', 'strokes', 'bg', 'shadow', 'glow', 'extrude', 'size', 'x', 'y', 'anim', 'animOut', 'opacity', 'rotation', 'scale', 'rx', 'ry', 'perspective', 'to', 'keys', 'ease', 'count', 'typeSpeed', 'cursor', 'align', 'react'],
   shape: ['id', 'kind', 'start', 'end', 'x', 'y', 'w', 'h', 'rotation', 'fill', 'stroke', 'strokeWidth', 'radius', 'opacity', 'shadow', 'anim', 'animOut', 'loop', 'scale', 'rx', 'ry', 'perspective', 'to', 'keys', 'ease'],
   overlay: ['id', 'media', 'start', 'in', 'out', 'speed', 'volume', 'x', 'y', 'w', 'rotation', 'opacity', 'scale', 'rx', 'ry', 'perspective', 'mask', 'radius', 'border', 'borderColor', 'shadow', 'anim', 'animOut', 'loop', 'keys', 'to', 'ease', 'cutout'],
+  gen: ['id', 'type', 'start', 'end', 'x', 'y', 'w', 'h', 'z', 'opacity', 'blend', 'rotation', 'scale', 'rx', 'ry', 'perspective', 'speed', 'offset', 'seed', 'params', 'colors', 'palette', 'mask', 'react', 'anim', 'animOut', 'loop', 'keys', 'to', 'ease'],
   effect: ['id', 'type', 'start', 'end', 'intensity', 'params', 'on', 'react', 'keys', 'to', 'ease', 'scale', 'x', 'y', 'rotation'],
   audio: ['id', 'media', 'start', 'in', 'out', 'volume', 'fadeIn', 'fadeOut', 'loop', 'sfx', 'song', 'auto'],
 };
@@ -148,6 +151,18 @@ export function validateProject(p) {
     enumOf(m.anim, ANIM_SHAPE, `${path}.anim`);
     if (m.colors != null && typeof m.colors !== 'object') err(`${path}.colors`, '{ "パレットのキー": "#rrggbb" } の形で指定してください');
     motion(m, path, m.end - m.start);
+  });
+  (p.gens || []).forEach((g, i) => {
+    const path = `gens[${i}]`;
+    unknown(g, 'gen', path);
+    enumOf(g.type, Object.keys(GENS), `${path}.type`);
+    timing(g, path, g.end);
+    enumOf(g.z, ['back', 'mid', 'top'], `${path}.z`);
+    enumOf(g.blend, Object.keys(BLENDS), `${path}.blend`);
+    if (typeof g.palette === 'string') enumOf(g.palette, Object.keys(PALETTES), `${path}.palette`);
+    const def = GENS[g.type];
+    if (def && g.params) for (const k of Object.keys(g.params)) if (!(k in def.defaults)) warn(`${path}.params.${k}`, `「${def.label}」にない項目です（${list(Object.keys(def.defaults))}）`);
+    motion(g, path, g.end - g.start);
   });
   (p.effects || []).forEach((e, i) => {
     const path = `effects[${i}]`;
