@@ -1,10 +1,10 @@
 /* つなぐ：オフラインでも開けるようにアプリ本体をキャッシュ（ネット優先） */
-const CACHE = 'tsunagu-v6';
+const CACHE = 'tsunagu-v7';
 const ASSETS = [
   './', 'index.html', 'css/editor.css', 'manifest.webmanifest',
   'js/app.js', 'js/player.js', 'js/timeline.js', 'js/store.js',
   'js/engine/project.js', 'js/engine/render.js', 'js/engine/media.js', 'js/engine/audio.js', 'js/engine/exporter.js', 'js/engine/fx.js', 'js/engine/cutout.js', 'js/engine/warp3d.js', 'js/engine/validate.js', 'js/engine/motionlib.js', 'js/extras.js', 'js/engine/gl.js', 'js/engine/post.js', 'js/engine/fonts.js', 'js/engine/audiofeat.js', 'js/engine/synth.js', 'js/engine/autosfx.js',
-  'js/engine/gens/index.js', 'js/engine/gens/all.js', 'js/engine/gens/particles.js', 'js/engine/gens/fluid.js', 'js/engine/gens/shaders.js', 'js/engine/gens/audio.js', 'js/engine/gens/backgrounds.js',
+  'js/engine/gens/index.js', 'js/engine/gens/all.js', 'js/engine/gens/particles.js', 'js/engine/gens/fluid.js', 'js/engine/gens/shaders.js', 'js/engine/gens/audio.js', 'js/engine/gens/backgrounds.js', 'js/engine/gens/algos.js',
   'lib/motion-prompt/catalog.json', 'lib/motion-prompt/motion.js', 'lib/motion-prompt/camera.js', 'lib/motion-prompt/ui.js', 'lib/motion-prompt/lp.js', 'lib/motion-prompt/photo.js',
   'lib/mediabunny.min.mjs', '../js/mp4.js',
   'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',

@@ -176,7 +176,10 @@ export function drawGen(ctx, W, H, g0, t, opts = {}) {
       return st.sim.s;
     },
   };
-  const { canvas, ctx: lc } = layerCanvas('gen', rw, rh);
+  // 入れ子（パネルの中のジェネレーター）は、深さごとに別の下書きを使う
+  const depth = opts.depth || 0;
+  c.opts = opts; c.depth = depth;
+  const { canvas, ctx: lc } = layerCanvas('gen' + depth, rw, rh);
   try {
     if (def.gl) {
       const S = GL();
@@ -206,7 +209,7 @@ export function drawGen(ctx, W, H, g0, t, opts = {}) {
   ctx.globalAlpha = Math.min(1, alpha);
   ctx.globalCompositeOperation = BLENDS[g.blend] || 'source-over';
   if (g.rx || g.ry) {
-    const full = layerCanvas('gen3d', W, H);
+    const full = layerCanvas('gen3d' + depth, W, H);
     full.ctx.drawImage(canvas, cx - w / 2, cy - h / 2, w, h);
     const r = Math.hypot(w, h) / 2 * 1.05;
     draw3D(ctx, full.canvas, { x: cx - r, y: cy - r, w: r * 2, h: r * 2 }, cx, cy, { rx: g.rx, ry: g.ry, perspective: g.perspective, backface: true }, W, H);

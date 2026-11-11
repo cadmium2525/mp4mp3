@@ -4,3 +4,4 @@ import './fluid.js';
 import './shaders.js';
 import './audio.js';
 import './backgrounds.js';
+import './algos.js';
