@@ -1,5 +1,5 @@
 /* かなでる：オフラインでも開けるようにアプリ本体をキャッシュ（ネット優先） */
-const CACHE = 'kanaderu-v2';
+const CACHE = 'kanaderu-v3';
 const ASSETS = [
   './', 'index.html', 'css/daw.css', 'manifest.webmanifest',
   'js/app.js', 'js/ui.js', 'js/store.js', 'js/player.js', 'js/worker.js', 'js/mp3worker.js', 'js/templates.js',

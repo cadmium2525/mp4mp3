@@ -11,7 +11,7 @@ import { renderArrange, updatePlayhead, initArrange } from './arrange.js';
 import { renderMixer, updateMeters } from './mixer.js';
 import { renderViz, tickViz } from './scope.js';
 import { openSfxStudio } from './sfxstudio.js';
-import { STYLES } from './engine/arranger.js';
+import { STYLES, chordsToBars, barsToChords } from './engine/arranger.js';
 
 /* ---------------- 状態 ---------------- */
 
@@ -255,6 +255,7 @@ function loopEditor() {
 function mainMenu() {
   const items = [
     ['曲の設定（テンポ・長さ・音量）', songSettings],
+    ['和音トラック（コード進行）', chordSheet],
     ['JSON をコピー（AI に渡す）', copyJson],
     ['JSON を貼り付け', pasteJson],
     ['見える化シートを画像で保存', () => { closeSheet(); setTab('viz'); setTimeout(() => document.dispatchEvent(new CustomEvent('kanaderu:sheet')), 50); }],
@@ -304,6 +305,32 @@ async function importJsonHome() {
     closeSheet();
     openSong(j.id, j);
   } }, '作成')], { tall: true });
+}
+
+/* ---------------- 和音トラック ---------------- */
+
+function chordSheet() {
+  const bpb = beatsPerBar(S.song);
+  let bars = [];
+  try { bars = chordsToBars(S.song); } catch { /* 和音がまだない */ }
+  // 4 小節ごとに 1 行。小節は | で区切る。1 小節に 2 つ入れるときは "C G"、のばすときは "."
+  const lines = [];
+  for (let i = 0; i < bars.length; i += 4) lines.push(bars.slice(i, i + 4).map((b) => b || '.').join(' | '));
+  const ta = el('textarea', { rows: Math.max(6, lines.length + 1), value: lines.join('\n'), spellcheck: false });
+  const err = el('div', { class: 'err' });
+  openSheet('和音トラック', [
+    el('p', { class: 'note' }, '1 行に 4 小節、小節は | で区切ります（例：Am | F | C | G）。1 小節に 2 つなら「C G」、前の和音を続けるなら「.」。自動クリップ（伴奏・ベース・メロディなど）は、この和音に合わせて演奏を作り直します。'),
+    ta, err,
+    el('button', { class: 'btn primary wide', type: 'button', style: { marginTop: '10px' }, onclick: () => {
+      const list = ta.value.split('\n').flatMap((ln) => (ln.trim() ? ln.split('|').map((x) => x.trim()) : [])).map((b) => (b === '.' ? '' : b));
+      let chords;
+      try { chords = barsToChords(list, bpb); } catch (e) { err.textContent = e.message; return; }
+      commit((x) => { x.chords = chords; });
+      closeSheet();
+      toast('和音を反映しました');
+    } }, '反映する'),
+    el('p', { class: 'note' }, '使える記号：C Cm C7 CM7 Cm7 Csus4 Cadd9 Cdim C/E など。'),
+  ], { tall: true });
 }
 
 /* ---------------- おまかせ作曲 ---------------- */

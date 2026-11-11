@@ -91,7 +91,12 @@ node daw/tools/audition.mjs inst|sfx 一覧.png                 # プリセッ�
 | 弦・プラック | guitar, nylon, harp, koto, pluck（シンセ）, pizz |
 | パッド・ストリングス | pad, darkpad, airpad, strings, choir, choiroo, glasspad |
 | ベース | subbass, synthbass, reese, bass808, fmbass, pluckbass, ebass（指弾き） |
-| リード・ブラス | sawlead, squarelead, softlead, chip（8bit）, flute, brass, supersaw |
+| リード・ブラス | sawlead, squarelead, softlead, chip（8bit）, flute, brass, supersaw, theremin, whistle（口笛）, voxlead, synthbrass, edmlead |
+| オーケストラ・管楽器 | violin, cello, spiccato（短く刻む弦）, trumpet, horn, trombone, clarinet, oboe, sax, timpani, orchhit |
+| 和楽器・民族楽器 | shakuhachi（尺八）, shamisen（三味線）, hichiriki（篳篥）, sitar（koto は「弦」にあります） |
+| 追加 | キー：honkytonk, toypiano, harpsichord, clavinet, accordion, harmonica ／ マレット：steeldrum ／ パッド：bellpad, stringmachine, futurebass ／ ベース：acid（303 風）, wobble, upright, slapbass |
+
+`lfo` に `"sync": "1/8"` を書くと、うねりが曲のテンポに合います（wobble・futurebass で使用）。
 
 どのプリセットも、同じフレーズで -20 LUFS になるよう音量がそろえてあります。
 `{ "preset": "pad", "amp": { "a": 2 }, "filter": { "cutoff": 800 } }` のように一部だけ変えられます。
@@ -99,8 +104,8 @@ node daw/tools/audition.mjs inst|sfx 一覧.png                 # プリセッ�
 
 ## ドラム
 
-キット：`acoustic`（スタンダード）/ `808` / `house` / `lofi` / `cinematic`。
-パーツ：`kick kick808 sub snare clap rim snap hat ohat ride crash tom1 tom2 tom3 shaker tamb cowbell perc`。
+キット：`acoustic`（スタンダード）/ `808` / `house` / `lofi` / `cinematic` / `rock` / `trap` / `jazz`（ブラシ）/ `chip`（8bit）/ `taiko`（和太鼓）。
+パーツ：`kick kick808 sub snare clap rim snap hat ohat ride crash tom1 tom2 tom3 shaker tamb cowbell perc brush odaiko（大太鼓）shime（締太鼓）kane（鉦）hyoshigi（拍子木）`。
 パーツごとの調整：`"tune": { "snare": { "tone": 0.3, "length": 0.8, "pitch": -2 } }`。
 オープンハイハットは次のハイハットで自動的に止まります（チョーク）。同じ音の連打も毎回わずかに変わります。
 
@@ -144,6 +149,10 @@ node daw/tools/audition.mjs inst|sfx 一覧.png                 # プリセッ�
 | バラエティ・ゲーム | sparkle magic boing jump powerup laser slide bell drumroll |
 | 生活音・環境 | shutter drop footstep wind rain page |
 | ドラム | kick kick808 snare clap hat ohat crash tom |
+| バラエティ定番 | pinpon（正解）bubu（不正解）shakin kiran dodon（和太鼓）tettere（ファンファーレ）deden（出題）jajan jan gaan hyuu（落下）dokaan poyon chiin（おりん）kaan（ゴング）hyoshigi（拍子木）pafu zuko pirorin hirameki doyon pyon tsuzumi（鼓）taikoroll furin（風鈴）shishiodoshi applause（拍手）schoolchime |
+| ゲーム | kettei（決定）cancel cursor levelup gameover kaifuku（回復）damage onebeep（3・2・1）warp robot scan |
+| 生活音（追加） | alarm phone ecg knock tick katana swish glass |
+| 映画・予告編 | subdrop risehit taperewind revswell tensionpulse stingdim charge whooshheavy |
 
 層を直接書くこともできます（音響デザイン：立ち上がり＋胴鳴り＋余韻＋空間を重ねる）：
 

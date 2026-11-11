@@ -13,6 +13,7 @@ export function el(tag, attrs = {}, children = []) {
     else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
     else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
     else if (k === 'html') e.innerHTML = v;
+    else if (k === 'value') e.value = v; // テキスト欄の初期値（属性ではなく中身に入れる）
     else if (k in e && typeof v !== 'string') e[k] = v;
     else e.setAttribute(k, v === true ? '' : v);
   }

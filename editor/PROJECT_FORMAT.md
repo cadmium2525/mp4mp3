@@ -343,6 +343,8 @@ Chromium が H.264 に対応していない環境では VP9/Opus で書き出さ
 | 音の可視化 | `spectrum` `wave` `radial` | style bars mirror … （動画の音のミックスに合わせて動く） |
 | | `pianoroll` | song（かなでるの曲 JSON）または media（生成した曲の ID）window playhead offset |
 | 背景 | `aurora` `stars` `plexus` `grid` | soft dark / count warp / count reach / speed sun |
+| アルゴリズム | `sort` `life` `maze` `mandelbrot` `pendulum` `epicycles` `boids` `raytrace` `voronoi` `flow` `tree` `hilbert` | speed ほか |
+| | `panels`（並べて同時に動かす） | items（種類の一覧。`{ "type": ..., "params": ..., "label": ... }` も可）cols gap labels stagger |
 | グラフ | `chart` | kind（bar/line/area/pie/hbar）data labels title unit highlight growDur stagger showValues max |
 
 配色（palette）：fire ocean neon sunset aurora candy ember ice mono gold forest duo。
