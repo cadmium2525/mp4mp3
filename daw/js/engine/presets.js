@@ -12,6 +12,8 @@ export const INST_CATEGORIES = [
   { id: 'pad', label: 'パッド・ストリングス' },
   { id: 'bass', label: 'ベース' },
   { id: 'lead', label: 'リード・ブラス' },
+  { id: 'orch', label: 'オーケストラ・管楽器' },
+  { id: 'wa', label: '和楽器・民族楽器' },
 ];
 
 export const INST_PRESETS = {
@@ -97,12 +99,87 @@ export const INST_PRESETS = {
     fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 90 }, { type: 'peak', freq: 1200, gain: 2, q: 0.8 }] }] },
   supersaw: { cat: 'lead', label: 'スーパーソウ（EDM）', type: 'synth', osc: [{ wave: 'supersaw', detune: 28, voices: 9, spread: 1 }, { wave: 'saw', semi: -12, level: 0.3 }], filter: { cutoff: 5000, env: 0.6, q: 0.6, keytrack: 0.3 }, amp: { a: 0.004, d: 0.3, s: 0.9, r: 0.25 }, gain: -12,
     fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 200 }] }] },
+
+  /* ---------- 追加：キー ---------- */
+  honkytonk: { cat: 'keys', label: 'ホンキートンク（酒場のピアノ）', type: 'partials', piano: true, hammer: 0.5, bright: 0.7, sustain: 5, amp: { a: 0.001, d: 60, s: 1, r: 0.3 }, gain: -4, spread: 0.5, drift: 14,
+    fx: [{ type: 'chorus', rate: 0.9, depth: 0.0022, mix: 0.45 }, { type: 'eq', bands: [{ type: 'hp', freq: 60 }, { type: 'peak', freq: 1800, gain: 3, q: 0.9 }] }] },
+  toypiano: { cat: 'keys', label: 'トイピアノ', type: 'partials', partials: [[1, 0.5, 1], [3.02, 0.18, 0.5], [5.4, 0.1, 0.35], [8.2, 0.05, 0.2]], mallet: 0.9, decayScale: 0.3, amp: { a: 0.0008, d: 10, s: 1, r: 0.2 }, gain: -4, hammer: 0.35, drift: 8, spread: 0.3 },
+  harpsichord: { cat: 'keys', label: 'チェンバロ', type: 'pluck', bright: 0.95, decay: 1.6, pick: 0.06, gain: 0, spread: 0.4, release: 0.08,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 100 }, { type: 'peak', freq: 3500, gain: 4, q: 0.8 }] }] },
+  clavinet: { cat: 'keys', label: 'クラビネット', type: 'pluck', bright: 0.8, decay: 0.9, pick: 0.1, gain: 2, release: 0.05,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 120 }, { type: 'peak', freq: 1100, gain: 6, q: 1.4 }] }, { type: 'dist', drive: 6, kind: 'tape', mix: 0.5 }] },
+  accordion: { cat: 'keys', label: 'アコーディオン', type: 'synth', osc: [{ wave: 'pulse', pw: 0.32 }, { wave: 'pulse', pw: 0.32, cents: 11, level: 0.8 }, { wave: 'pulse', pw: 0.4, semi: 12, cents: -6, level: 0.35 }], filter: { cutoff: 2600, q: 0.6, keytrack: 0.5, vel: 0.6 }, amp: { a: 0.05, d: 0.2, s: 0.95, r: 0.12 }, gain: -12,
+    lfo: { to: 'amp', rate: 5.2, amt: 0.08 }, fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 120 }, { type: 'peak', freq: 900, gain: 3, q: 0.8 }] }] },
+  harmonica: { cat: 'keys', label: 'ハーモニカ', type: 'synth', osc: [{ wave: 'pulse', pw: 0.22 }, { wave: 'saw', level: 0.3 }], noise: 0.03, noiseColor: 'pink', filter: { type: 'bp', cutoff: 1500, q: 0.9, keytrack: 0.7 }, amp: { a: 0.04, d: 0.2, s: 0.9, r: 0.1 }, pitchEnv: { amt: -0.5, time: 0.05 }, vibrato: { rate: 5.5, depth: 0.2, delay: 0.25 }, gain: -6, mono: true,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 250 }, { type: 'peak', freq: 2400, gain: 4, q: 1 }] }] },
+
+  /* ---------- 追加：マレット ---------- */
+  steeldrum: { cat: 'mallet', label: 'スチールドラム', type: 'partials', partials: [[1, 0.9, 1], [2, 0.7, 0.75], [3.01, 0.35, 0.3], [4.02, 0.25, 0.25], [6.1, 0.1, 0.1]], mallet: 0.75, decayScale: 0.35, tremolo: { rate: 6.5, depth: 0.12 }, amp: { a: 0.001, d: 10, s: 1, r: 0.4 }, gain: -5, spread: 0.5, hammer: 0.1 },
+
+  /* ---------- 追加：パッド ---------- */
+  bellpad: { cat: 'pad', label: 'ベルパッド', type: 'fm', gain: -8, spread: 0.4, ops: [{ ratio: 1, level: 1, amp: { a: 0.25, d: 3, s: 0.6, r: 2 } }, { ratio: 4, level: 0.9, amp: { a: 0.01, d: 1.2, s: 0.1, r: 1.5 }, vel: 0.5 }, { ratio: 1.005, level: 0.5, amp: { a: 0.8, d: 2, s: 0.7, r: 2 } }], mods: [[1], [], []], out: [0, 2],
+    fx: [{ type: 'chorus', mix: 0.45 }] },
+  stringmachine: { cat: 'pad', label: 'ストリングマシン（70年代）', type: 'synth', osc: [{ wave: 'saw', voices: 3, detune: 16 }, { wave: 'pulse', pw: 0.4, semi: 12, level: 0.3 }], filter: { cutoff: 3200, q: 0.5, keytrack: 0.5 }, amp: { a: 0.18, d: 0.5, s: 0.95, r: 0.6 }, gain: -12,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 180 }] }, { type: 'chorus', rate: 0.7, depth: 0.005, mix: 0.6 }, { type: 'phaser', rate: 0.25, mix: 0.3 }] },
+  futurebass: { cat: 'pad', label: 'フューチャーベース（うねる和音）', type: 'synth', osc: [{ wave: 'supersaw', detune: 26, voices: 9, spread: 1 }, { wave: 'square', semi: 12, level: 0.2 }], filter: { cutoff: 1400, env: 1.2, q: 0.9, keytrack: 0.3 }, fenv: { a: 0.01, d: 0.4, s: 0.5, r: 0.3 }, amp: { a: 0.01, d: 0.3, s: 0.9, r: 0.3 }, lfo: { to: 'cutoff', sync: '1/8', amt: 1.4, phase: -1.57 }, gain: -12,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 180 }] }] },
+
+  /* ---------- 追加：ベース ---------- */
+  acid: { cat: 'bass', label: 'アシッドベース（303 風）', type: 'synth', osc: [{ wave: 'saw' }], filter: { cutoff: 220, env: 3.6, q: 6, keytrack: 0.3, poles: 4, drive: 6, vel: 2.5 }, fenv: { a: 0.002, d: 0.18, s: 0.05, r: 0.1 }, amp: { a: 0.002, d: 0.3, s: 0.7, r: 0.06 }, gain: -14, mono: true, glide: 0.07,
+    fx: [{ type: 'dist', drive: 8, kind: 'soft', mix: 0.6, tone: 6000 }, { type: 'eq', bands: [{ type: 'hp', freq: 35 }] }] },
+  wobble: { cat: 'bass', label: 'ワブルベース', type: 'synth', osc: [{ wave: 'saw', voices: 2, detune: 14, spread: 0.2 }, { wave: 'square', semi: -12, level: 0.7 }], filter: { cutoff: 420, q: 2.4, keytrack: 0.2, poles: 4, drive: 5 }, amp: { a: 0.004, d: 0.3, s: 1, r: 0.08 }, lfo: { to: 'cutoff', sync: '1/8', amt: 2.2 }, gain: -8, mono: true,
+    fx: [{ type: 'dist', drive: 8, kind: 'tape', mix: 0.5 }, { type: 'widen', amount: 1.2, lowmono: 150 }] },
+  upright: { cat: 'bass', label: 'ウッドベース', type: 'pluck', bright: 0.16, decay: 1.8, pick: 0.3, body: 1.2, gain: 8, mono: true, release: 0.12,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 35 }, { type: 'lp', freq: 2600 }, { type: 'peak', freq: 180, gain: 3, q: 1 }, { type: 'peak', freq: 900, gain: 2, q: 1.2 }] }] },
+  slapbass: { cat: 'bass', label: 'スラップベース', type: 'pluck', bright: 0.7, decay: 1.2, pick: 0.08, gain: 4, mono: true, release: 0.05,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 35 }, { type: 'peak', freq: 500, gain: -4, q: 1 }, { type: 'peak', freq: 2800, gain: 5, q: 1 }] }, { type: 'comp', threshold: -20, ratio: 5, attack: 0.004, release: 0.1, makeup: 4 }] },
+
+  /* ---------- 追加：リード ---------- */
+  theremin: { cat: 'lead', label: 'テルミン', type: 'synth', osc: [{ wave: 'sine' }, { wave: 'tri', level: 0.12 }], filter: { cutoff: 5000, q: 0.5 }, amp: { a: 0.09, d: 0.3, s: 0.95, r: 0.25 }, vibrato: { rate: 6, depth: 0.35, delay: 0.1, fade: 0.3 }, gain: -4, mono: true, glide: 0.14 },
+  whistle: { cat: 'lead', label: '口笛', type: 'synth', osc: [{ wave: 'sine' }], noise: 0.035, noiseColor: 'pink', filter: { type: 'bp', cutoff: 1800, q: 1.2, keytrack: 1 }, amp: { a: 0.05, d: 0.2, s: 0.9, r: 0.12 }, pitchEnv: { amt: -0.7, time: 0.05 }, vibrato: { rate: 5.5, depth: 0.14, delay: 0.3 }, gain: 2, mono: true, glide: 0.04 },
+  voxlead: { cat: 'lead', label: 'ボイスリード（おー）', type: 'synth', osc: [{ wave: 'saw', voices: 2, detune: 7 }], formant: 'o', filter: { cutoff: 4500, q: 0.5 }, amp: { a: 0.06, d: 0.3, s: 0.9, r: 0.2 }, vibrato: { rate: 5.4, depth: 0.2, delay: 0.25 }, gain: 2, mono: true, glide: 0.07 },
+  synthbrass: { cat: 'lead', label: 'シンセブラス（80年代）', type: 'synth', osc: [{ wave: 'saw', voices: 4, detune: 14 }, { wave: 'saw', semi: -12, level: 0.4 }], filter: { cutoff: 700, env: 2.8, q: 0.8, keytrack: 0.5, vel: 1.5 }, fenv: { a: 0.05, d: 0.35, s: 0.5, r: 0.2 }, amp: { a: 0.02, d: 0.3, s: 0.9, r: 0.2 }, gain: -10,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 100 }] }, { type: 'chorus', mix: 0.25 }] },
+  edmlead: { cat: 'lead', label: 'EDM リード（鋭い）', type: 'synth', osc: [{ wave: 'supersaw', detune: 18, voices: 7, spread: 0.7 }, { wave: 'pulse', pw: 0.3, level: 0.5 }, { wave: 'saw', semi: 12, level: 0.25 }], filter: { cutoff: 6500, env: 0.8, q: 1, keytrack: 0.4 }, amp: { a: 0.003, d: 0.2, s: 0.85, r: 0.12 }, gain: -12, mono: true, glide: 0.03,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 220 }, { type: 'highshelf', freq: 7000, gain: 2 }] }, { type: 'dist', drive: 5, kind: 'soft', mix: 0.4 }] },
+
+  /* ---------- オーケストラ・管楽器 ---------- */
+  violin: { cat: 'orch', label: 'バイオリン（ソロ）', type: 'synth', osc: [{ wave: 'saw' }, { wave: 'saw', cents: 5, level: 0.35 }], noise: 0.012, noiseColor: 'pink', filter: { cutoff: 3200, env: 0.5, q: 0.7, keytrack: 0.6, vel: 1.2 }, fenv: { a: 0.12, d: 0.6, s: 0.8, r: 0.3 }, amp: { a: 0.09, d: 0.3, s: 0.92, r: 0.22 }, pitchEnv: { amt: -0.25, time: 0.06 }, vibrato: { rate: 5.8, depth: 0.22, delay: 0.22, fade: 0.35 }, gain: -8, mono: true, glide: 0.035,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 190 }, { type: 'peak', freq: 290, gain: 3, q: 2 }, { type: 'peak', freq: 520, gain: 2, q: 2 }, { type: 'peak', freq: 2800, gain: 4, q: 0.9 }, { type: 'lp', freq: 9000 }] }] },
+  cello: { cat: 'orch', label: 'チェロ（ソロ）', type: 'synth', osc: [{ wave: 'saw' }, { wave: 'saw', cents: 4, level: 0.3 }], noise: 0.01, noiseColor: 'pink', filter: { cutoff: 1500, env: 0.5, q: 0.7, keytrack: 0.5, vel: 1.2 }, fenv: { a: 0.15, d: 0.6, s: 0.8, r: 0.3 }, amp: { a: 0.11, d: 0.3, s: 0.92, r: 0.28 }, pitchEnv: { amt: -0.2, time: 0.07 }, vibrato: { rate: 5.2, depth: 0.16, delay: 0.3, fade: 0.4 }, gain: -6, mono: true, glide: 0.04,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 60 }, { type: 'peak', freq: 180, gain: 3, q: 1.6 }, { type: 'peak', freq: 400, gain: 2, q: 1.6 }, { type: 'peak', freq: 1500, gain: 2, q: 1 }, { type: 'lp', freq: 6000 }] }] },
+  spiccato: { cat: 'orch', label: 'ストリングス（短く刻む）', type: 'synth', osc: [{ wave: 'saw', voices: 5, detune: 12, spread: 0.9 }], noise: 0.02, noiseColor: 'pink', filter: { cutoff: 2000, env: 2, q: 0.6, keytrack: 0.5, vel: 1.5 }, fenv: { a: 0.004, d: 0.12, s: 0.1, r: 0.12 }, amp: { a: 0.006, d: 0.16, s: 0.0, r: 0.14 }, gain: -6,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 110 }, { type: 'peak', freq: 2600, gain: 2, q: 0.8 }] }] },
+  trumpet: { cat: 'orch', label: 'トランペット', type: 'synth', osc: [{ wave: 'saw' }, { wave: 'pulse', pw: 0.2, level: 0.35 }], filter: { cutoff: 900, env: 2.2, q: 1, keytrack: 0.6, vel: 2 }, fenv: { a: 0.035, d: 0.3, s: 0.65, r: 0.15 }, amp: { a: 0.025, d: 0.2, s: 0.9, r: 0.12 }, pitchEnv: { amt: -0.4, time: 0.03 }, vibrato: { rate: 5.4, depth: 0.1, delay: 0.4 }, gain: -8, mono: true,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 160 }, { type: 'peak', freq: 1400, gain: 4, q: 1 }, { type: 'peak', freq: 2600, gain: 3, q: 1 }] }] },
+  horn: { cat: 'orch', label: 'ホルン', type: 'synth', osc: [{ wave: 'saw' }, { wave: 'tri', level: 0.6 }], filter: { cutoff: 420, env: 1.6, q: 0.7, keytrack: 0.5, vel: 1.8 }, fenv: { a: 0.08, d: 0.5, s: 0.6, r: 0.25 }, amp: { a: 0.06, d: 0.3, s: 0.92, r: 0.25 }, pitchEnv: { amt: -0.3, time: 0.05 }, gain: -4,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 80 }, { type: 'peak', freq: 450, gain: 3, q: 1 }] }] },
+  trombone: { cat: 'orch', label: 'トロンボーン', type: 'synth', osc: [{ wave: 'saw' }, { wave: 'pulse', pw: 0.3, level: 0.25 }], filter: { cutoff: 600, env: 2, q: 0.9, keytrack: 0.5, vel: 2 }, fenv: { a: 0.05, d: 0.35, s: 0.6, r: 0.18 }, amp: { a: 0.035, d: 0.25, s: 0.9, r: 0.15 }, pitchEnv: { amt: -0.5, time: 0.05 }, gain: -7, mono: true, glide: 0.09,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 70 }, { type: 'peak', freq: 700, gain: 3, q: 1 }] }] },
+  clarinet: { cat: 'orch', label: 'クラリネット', type: 'synth', osc: [{ wave: 'pulse', pw: 0.5 }], noise: 0.012, noiseColor: 'pink', filter: { cutoff: 1500, env: 0.6, q: 0.7, keytrack: 0.7, vel: 1 }, fenv: { a: 0.05, d: 0.3, s: 0.8, r: 0.15 }, amp: { a: 0.05, d: 0.2, s: 0.92, r: 0.12 }, vibrato: { rate: 5, depth: 0.05, delay: 0.5 }, gain: -8, mono: true,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 120 }] }] },
+  oboe: { cat: 'orch', label: 'オーボエ', type: 'synth', osc: [{ wave: 'pulse', pw: 0.16 }, { wave: 'saw', level: 0.25 }], filter: { type: 'bp', cutoff: 1300, q: 0.8, keytrack: 0.6 }, amp: { a: 0.04, d: 0.2, s: 0.9, r: 0.1 }, vibrato: { rate: 5.6, depth: 0.12, delay: 0.3 }, gain: -3, mono: true,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 220 }, { type: 'peak', freq: 3000, gain: 3, q: 1 }] }] },
+  sax: { cat: 'orch', label: 'サックス', type: 'synth', osc: [{ wave: 'saw' }, { wave: 'pulse', pw: 0.35, level: 0.5 }], noise: 0.035, noiseColor: 'pink', filter: { cutoff: 1100, env: 1.4, q: 1.6, keytrack: 0.5, vel: 2, drive: 3 }, fenv: { a: 0.04, d: 0.3, s: 0.7, r: 0.15 }, amp: { a: 0.03, d: 0.2, s: 0.9, r: 0.12 }, pitchEnv: { amt: -0.6, time: 0.05 }, vibrato: { rate: 5.2, depth: 0.16, delay: 0.3 }, gain: -8, mono: true, glide: 0.03,
+    fx: [{ type: 'eq', bands: [{ type: 'hp', freq: 110 }, { type: 'peak', freq: 1000, gain: 3, q: 1 }, { type: 'peak', freq: 2400, gain: 2, q: 1 }] }] },
+  timpani: { cat: 'orch', label: 'ティンパニ', type: 'partials', partials: [[1, 1.6, 1], [1.5, 1.2, 0.6], [1.99, 0.9, 0.4], [2.44, 0.6, 0.25], [2.89, 0.4, 0.15]], mallet: 0.6, amp: { a: 0.002, d: 10, s: 1, r: 0.8 }, gain: -2, hammer: 0.5, velCurve: 1.6 },
+  orchhit: { cat: 'orch', label: 'オーケストラヒット', type: 'synth', osc: [{ wave: 'supersaw', detune: 20, voices: 7 }, { wave: 'saw', semi: 12, level: 0.5 }, { wave: 'saw', semi: -12, level: 0.6 }, { wave: 'saw', semi: 7, level: 0.35 }], noise: 0.12, filter: { cutoff: 1200, env: 3, q: 0.7, keytrack: 0.3 }, fenv: { a: 0.002, d: 0.25, s: 0.1, r: 0.2 }, amp: { a: 0.002, d: 0.45, s: 0, r: 0.3 }, gain: -8,
+    fx: [{ type: 'reverb', size: 1.4, decay: 1.4, mix: 0.25 }] },
+
+  /* ---------- 和楽器・民族楽器 ---------- */
+  shakuhachi: { cat: 'wa', label: '尺八', type: 'synth', osc: [{ wave: 'sine' }, { wave: 'tri', semi: 12, level: 0.1 }], noise: 0.16, noiseColor: 'pink', filter: { type: 'bp', cutoff: 1200, q: 0.9, keytrack: 0.9 }, amp: { a: 0.08, d: 0.4, s: 0.85, r: 0.25 }, pitchEnv: { amt: -1.6, time: 0.09 }, vibrato: { rate: 4.6, depth: 0.3, delay: 0.35, fade: 0.5 }, gain: 4, mono: true, glide: 0.08 },
+  shamisen: { cat: 'wa', label: '三味線', type: 'pluck', bright: 0.85, decay: 0.9, pick: 0.05, body: 0.3, gain: 2, release: 0.1, spread: 0.2,
+    fx: [{ type: 'dist', drive: 9, kind: 'tape', mix: 0.45, tone: 7000 }, { type: 'eq', bands: [{ type: 'hp', freq: 140 }, { type: 'peak', freq: 1600, gain: 4, q: 1.2 }, { type: 'peak', freq: 4200, gain: 3, q: 1 }] }] },
+  sitar: { cat: 'wa', label: 'シタール', type: 'pluck', bright: 0.9, decay: 3.5, pick: 0.04, gain: 0, release: 0.4, spread: 0.3,
+    fx: [{ type: 'dist', drive: 12, kind: 'fold', mix: 0.3, tone: 8000 }, { type: 'flanger', rate: 0.2, mix: 0.3 }, { type: 'eq', bands: [{ type: 'hp', freq: 120 }, { type: 'peak', freq: 2500, gain: 4, q: 1 }] }] },
+  hichiriki: { cat: 'wa', label: '篳篥（ひちりき）', type: 'synth', osc: [{ wave: 'pulse', pw: 0.12 }, { wave: 'saw', level: 0.4 }], noise: 0.04, noiseColor: 'pink', filter: { type: 'bp', cutoff: 1700, q: 1.2, keytrack: 0.6 }, amp: { a: 0.1, d: 0.3, s: 0.92, r: 0.2 }, pitchEnv: { amt: -1.2, time: 0.14 }, vibrato: { rate: 4.2, depth: 0.25, delay: 0.4 }, gain: -2, mono: true, glide: 0.12 },
 };
 
 /* ---------- ドラム：パーツごとの基準のピーク（dBFS、強さ 1 のとき） ---------- */
 export const DRUM_PEAK = {
   kick: -6, kick808: -6, sub: -8, snare: -8, clap: -10, rim: -14, snap: -14, perc: -14,
   hat: -17, ohat: -17, ride: -17, crash: -14, tom1: -9, tom2: -9, tom3: -8, tom: -9, shaker: -20, tamb: -18, cowbell: -16,
+  brush: -12, odaiko: -5, shime: -9, kane: -14, hyoshigi: -10,
 };
 
 /* ---------- ドラムキット：パーツごとの調整 ---------- */
@@ -114,6 +191,15 @@ export const KITS = {
     fx: [{ type: 'comp', threshold: -12, ratio: 4, attack: 0.005, release: 0.1, makeup: 2 }] },
   lofi: { label: 'ローファイ', map: { kick: { punch: 0.3, tone: -0.5 }, snare: { tone: -0.4, space: 0.1 }, hat: { tone: -0.6, length: 0.8 }, ohat: { tone: -0.5 }, rim: { tone: -0.3 } },
     fx: [{ type: 'eq', bands: [{ type: 'lp', freq: 7000 }, { type: 'peak', freq: 120, gain: 2, q: 1 }] }, { type: 'crush', bits: 12, rate: 2, mix: 0.4 }, { type: 'comp', threshold: -16, ratio: 3, attack: 0.01, release: 0.15, makeup: 2 }] },
+  rock: { label: 'ロック', map: { kick: { punch: 1, tone: 0.3, length: 1.1 }, snare: { tone: 0.25, length: 1.3, space: 0.3, punch: 0.9 }, hat: { tone: 0.2 }, ohat: { length: 1.2 }, crash: { length: 1.2 }, tom1: { length: 1.2 }, tom2: { length: 1.2 }, tom3: { length: 1.3 } },
+    fx: [{ type: 'comp', threshold: -16, ratio: 4, attack: 0.006, release: 0.1, makeup: 3 }, { type: 'dist', drive: 3, kind: 'tape', mix: 0.3 }] },
+  trap: { label: 'トラップ', map: { kick: { piece: 'kick808', length: 1.3, punch: 0.7 }, snare: { tone: 0.5, length: 0.7, pitch: 2 }, clap: { space: 0.35, tone: 0.3 }, hat: { pitch: 5, tone: 0.7, length: 0.6 }, ohat: { pitch: 5, length: 0.6 }, rim: { pitch: 3 } },
+    fx: [{ type: 'comp', threshold: -12, ratio: 3, attack: 0.004, release: 0.08, makeup: 2 }] },
+  jazz: { label: 'ジャズ（ブラシ）', map: { kick: { punch: 0.2, tone: -0.6, length: 0.8 }, snare: { piece: 'brush' }, hat: { tone: -0.3, length: 0.8 }, ohat: { tone: -0.2 }, ride: { length: 1.3 }, crash: { tone: -0.2 } },
+    fx: [{ type: 'reverb', size: 0.8, decay: 0.9, mix: 0.12 }] },
+  chip: { label: '8bit（ゲーム機）', map: { kick: { piece: 'sqkick' }, snare: { piece: 'noisehit', open: 0.6 }, clap: { piece: 'noisehit', open: 0.4, pitch: 5 }, hat: { piece: 'noisehit', pitch: 12 }, ohat: { piece: 'noisehit', pitch: 12, open: 1 }, crash: { piece: 'noisehit', open: 3, pitch: 7 }, tom1: { piece: 'sqkick', pitch: 12 }, tom2: { piece: 'sqkick', pitch: 7 }, tom3: { piece: 'sqkick', pitch: 3 }, rim: { piece: 'noisehit', pitch: 18 }, shaker: { piece: 'noisehit', pitch: 16 } } },
+  taiko: { label: '和太鼓', map: { kick: { piece: 'odaiko' }, tom3: { piece: 'odaiko', pitch: 3, length: 0.8 }, tom2: { piece: 'odaiko', pitch: 7, length: 0.6 }, tom1: { piece: 'shime', pitch: -5 }, snare: { piece: 'shime' }, rim: { piece: 'hyoshigi' }, hat: { piece: 'kane', length: 0.4, pitch: 2 }, ohat: { piece: 'kane' }, crash: { piece: 'kane', length: 1.6, pitch: -4 }, clap: { piece: 'hyoshigi' } },
+    fx: [{ type: 'reverb', size: 1.5, decay: 1.8, mix: 0.18 }] },
   cinematic: { label: 'シネマティック', map: { kick: { piece: 'tom3', pitch: -7, length: 1.8 }, snare: { space: 0.5, length: 1.4 }, tom1: { length: 1.4 }, tom2: { length: 1.4 }, tom3: { length: 1.6 } },
     fx: [{ type: 'reverb', size: 1.8, decay: 2.5, mix: 0.25 }] },
 };

@@ -12,7 +12,7 @@ import { trackType, clipLen } from './arrange.js';
 const KEYW = 46, RULER = 22, ROWH = 18;
 const LOW = 24, HIGH = 96; // C1〜C7
 const BLACK = new Set([1, 3, 6, 8, 10]);
-const DRUM_LABEL = { kick: 'キック', kick808: '808キック', sub: 'サブ', snare: 'スネア', clap: 'クラップ', rim: 'リム', snap: 'スナップ', hat: 'ハイハット', ohat: 'オープンHH', ride: 'ライド', crash: 'クラッシュ', tom1: 'タム高', tom2: 'タム中', tom3: 'タム低', shaker: 'シェイカー', tamb: 'タンバリン', cowbell: 'カウベル', perc: 'パーカッション' };
+const DRUM_LABEL = { kick: 'キック', kick808: '808キック', sub: 'サブ', snare: 'スネア', clap: 'クラップ', rim: 'リム', snap: 'スナップ', hat: 'ハイハット', ohat: 'オープンHH', ride: 'ライド', crash: 'クラッシュ', tom1: 'タム高', tom2: 'タム中', tom3: 'タム低', shaker: 'シェイカー', tamb: 'タンバリン', cowbell: 'カウベル', perc: 'パーカッション', brush: 'ブラシ', odaiko: '大太鼓', shime: '締太鼓', kane: '鉦（かね）', hyoshigi: '拍子木' };
 const CORE_DRUMS = ['kick', 'snare', 'clap', 'hat', 'ohat', 'crash'];
 
 /** 編集対象（パターンを使っていればパターン） */

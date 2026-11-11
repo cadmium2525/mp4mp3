@@ -19,6 +19,7 @@ function renderSource(song, track, n, sr, onProgress) {
   const spb = secPerBeat(song) * sr;
   if (type === 'inst') {
     const inst = resolveInst(track.inst);
+    inst.bpm = song.bpm || 120;
     renderNotes(inst, toSamples(song, track, notes, sr), L, R, sr, hashSeed(String(track.id || track.name)), onProgress);
     return { L, R, presetFx: inst.fx || [] };
   }

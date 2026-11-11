@@ -6,7 +6,7 @@
  *   partials… 倍音を足し合わせる（ピアノ・マリンバ・ベル・オルガン）
  * 1音ごとに Voice を作り、ステレオのバッファへ足し込む。
  */
-import { ADSR, Osc, Noise, SVF, Biquad, OnePole, Delay, rng, clamp, dbToGain, midiToFreq, TAU } from './dsp.js';
+import { ADSR, Osc, Noise, SVF, Biquad, OnePole, Delay, rng, clamp, dbToGain, midiToFreq, noteValue, TAU } from './dsp.js';
 
 const CR = 16; // コントロールレート（ピッチやフィルターを更新する間隔）
 
@@ -64,6 +64,8 @@ class SynthVoice {
     this.form = p.formant ? (VOWELS[p.formant] || VOWELS.a).map(([fr, g, bw]) => ({ l: new SVF(sr, 'bp'), r: new SVF(sr, 'bp'), fr, g, q: fr / bw })) : null;
     if (this.form) for (const x of this.form) { x.l.set(x.fr, x.q); x.r.set(x.fr, x.q); }
     this.gain = dbToGain(p.gain ?? 0) * Math.pow(vel, p.velCurve ?? 1.2);
+    // LFO：sync（"1/8" など）があれば曲のテンポに合わせる
+    this.lfo = p.lfo ? { ...p.lfo, rate: p.lfo.sync ? (p.bpm || 120) / 60 / noteValue(p.lfo.sync) : p.lfo.rate } : null;
     this.t = 0;
   }
   release() { this.aenv.release(); this.fenv.release(); }
@@ -72,7 +74,7 @@ class SynthVoice {
     const p = this.p, sr = this.sr, f = p.filter || {};
     const cutoff = f.cutoff ?? 8000, q = f.q ?? 0.8, envAmt = f.env ?? 0, key = f.keytrack ?? 0.5, velAmt = f.vel ?? 1;
     const drive = f.drive ? dbToGain(f.drive) : 0;
-    const lfo = p.lfo, vib = p.vibrato, pe = p.pitchEnv;
+    const lfo = this.lfo, vib = p.vibrato, pe = p.pitchEnv;
     let pitch = this.midi, dtBase = 0, fc = cutoff;
     for (let i = 0; i < n; i++) {
       if (i % CR === 0) {
@@ -88,7 +90,7 @@ class SynthVoice {
         dtBase = midiToFreq(pitch) / sr;
         // フィルター
         let oct = envAmt * this.fenv.v + key * ((this.midi - 60) / 12) + velAmt * (this.vel - 0.8);
-        if (lfo?.to === 'cutoff') oct += Math.sin(TAU * lfo.rate * t + (lfo.phase ?? 0)) * lfo.amt;
+        if (lfo?.to === 'cutoff') oct += Math.sin(TAU * lfo.rate * (t + (lfo.sync ? this.t0 || 0 : 0)) + (lfo.phase ?? 0)) * lfo.amt;
         fc = cutoff * Math.pow(2, oct);
         for (const x of this.fl) x.set(fc, q);
         for (const x of this.fr) x.set(fc, q);
@@ -367,6 +369,7 @@ export function renderNotes(inst, notes, L, R, sr, seed = 1, onProgress) {
     // モノフォニック（mono:true）：前の音から滑らかにつなぐ
     const glideFrom = inst.mono && prev && prev.s + prev.len >= nt.s - sr * 0.01 ? prev.m : undefined;
     const voice = new V(sr, inst, nt.m + (inst.transpose ?? 0), nt.v, seed + k * 7919, glideFrom);
+    voice.t0 = nt.s / sr; // 曲の中での開始時刻（テンポに合わせた LFO 用）
     let pos = nt.s;
     // 鳴っている間
     const on = Math.min(nt.len, total - pos);

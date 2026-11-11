@@ -646,11 +646,39 @@ export function drum(name, o = {}, r = rng(1)) {
     ], fx: verb(o.space ?? 0.3, 0.6, 0.8) };
     case 'perc': return { layers: [{ src: 'sine', freq: [[0, 900 * p], [0.02, 600 * p, 'exp']], amp: { a: 0.0005, d: 0.08 * Ln } }, { src: 'noise', filter: { type: 'bp', freq: vt(3000), q: 2 }, amp: { a: 0.0002, d: 0.01 }, gain: -10 }] };
     case 'sub': return { layers: [{ src: 'sine', freq: [[0, 70 * p], [0.08, 50 * p, 'exp']], amp: { a: 0.002, h: 0.1, d: 0.9 * Ln }, drive: 3 }] };
+    /* ---- 和太鼓・和の鳴り物 ---- */
+    case 'odaiko': return { layers: [
+      { src: 'sine', freq: [[0, 130 * p * jit(r, 0.02)], [0.05, 62 * p, 'exp'], [0.8, 52 * p, 'exp']], amp: { a: 0.001, h: 0.03, d: 1.3 * Ln }, drive: 7 },
+      { src: 'tri', freq: [[0, 300 * p], [0.06, 150 * p, 'exp']], amp: { a: 0.0008, d: 0.28 * Ln }, drive: 10, gain: -5, lp: 2200 },
+      { src: 'pink', width: 0.4, filter: { type: 'bp', freq: [[0, vt(1400)], [0.1, 400, 'exp']], q: 0.8 }, amp: { a: 0.0005, d: 0.14 }, gain: -3 },
+      { src: 'noise', filter: { type: 'bp', freq: vt(3200), q: 1 }, amp: { a: 0.0003, d: 0.012 }, gain: -8 },
+    ], fx: [{ type: 'transient', attack: 4 }, ...verb(o.space ?? 0.3, 1.3, 1.6)] };
+    case 'shime': return { layers: [
+      { src: 'tri', freq: [[0, 520 * p * jit(r, 0.02)], [0.02, 380 * p, 'exp']], amp: { a: 0.0004, d: 0.09 * Ln }, gain: -2 },
+      { src: 'sine', freq: 760 * p, amp: { a: 0.0004, d: 0.05 }, gain: -8 },
+      { src: 'noise', filter: { type: 'bp', freq: vt(3800), q: 1.2 }, amp: { a: 0.0003, d: 0.03 }, gain: -6 },
+    ], fx: verb(o.space ?? 0.15, 0.7, 0.7) };
+    case 'kane': return { layers: [
+      { src: 'modal', freq: 2100 * p * jit(r, 0.01), modes: [[1, 0.5 * Ln, 1], [1.47, 0.35, 0.7], [2.09, 0.25, 0.5], [2.56, 0.18, 0.35], [3.9, 0.08, 0.2]], amp: { a: 0.0004, h: 0.3 * Ln, d: 0.25 }, gain: -2 },
+      { src: 'noise', filter: { type: 'bp', freq: vt(6000), q: 2 }, amp: { a: 0.0002, d: 0.008 }, gain: -10 },
+    ] };
+    case 'hyoshigi': return { layers: [
+      { src: 'modal', freq: 1150 * p * jit(r, 0.02), modes: [[1, 0.045, 1], [2.7, 0.02, 0.6], [5.1, 0.01, 0.35]], amp: { a: 0.0002, h: 0.05, d: 0.05 } },
+      { src: 'noise', filter: { type: 'bp', freq: vt(2600), q: 1.5 }, amp: { a: 0.0002, d: 0.012 }, gain: -4 },
+    ], fx: verb(o.space ?? 0.35, 0.9, 1.1) };
+    /* ---- ブラシ（ジャズ） ---- */
+    case 'brush': return { layers: [
+      { src: 'pink', width: 0.5, filter: { type: 'bp', freq: vt(3200) * jit(r, 0.08), q: 0.7 }, amp: [[0, 0], [0.012, 1], [0.05, 0.5], [0.16 * Ln, 0, 'out']], gain: -2 },
+      { src: 'tri', freq: [[0, 260 * p], [0.03, 190 * p, 'exp']], amp: { a: 0.001, d: 0.07 }, gain: -12 },
+    ] };
+    /* ---- 8bit ---- */
+    case 'sqkick': return { layers: [{ src: 'square', freq: [[0, 220 * p], [0.09, 45 * p, 'exp']], amp: [[0, 0], [0.001, 1], [0.1 * Ln, 0.6], [0.13 * Ln, 0]], lp: 5000 }] };
+    case 'noisehit': return { layers: [{ src: 'noise', amp: [[0, 0], [0.001, 1], [(0.03 + (o.open || 0) * 0.12) * Ln, 0.5], [(0.06 + (o.open || 0) * 0.2) * Ln, 0]], hp: 800 * p }], fx: [{ type: 'crush', bits: 4, rate: Math.max(2, Math.round(10 / p)), mix: 1 }] };
     default: throw new Error(`不明なドラム: ${name}`);
   }
 }
 
-export const DRUM_NAMES = ['kick', 'kick808', 'snare', 'clap', 'rim', 'snap', 'hat', 'ohat', 'ride', 'crash', 'tom1', 'tom2', 'tom3', 'shaker', 'tamb', 'cowbell', 'perc', 'sub'];
+export const DRUM_NAMES = ['kick', 'kick808', 'snare', 'clap', 'rim', 'snap', 'hat', 'ohat', 'ride', 'crash', 'tom1', 'tom2', 'tom3', 'shaker', 'tamb', 'cowbell', 'perc', 'sub', 'brush', 'odaiko', 'shime', 'kane', 'hyoshigi'];
 
 /** プリセット名 + つまみ → 効果音の定義 */
 export function sfxFromPreset(spec) {
@@ -668,3 +696,152 @@ export function sfxFromPreset(spec) {
 export function renderAnySfx(spec, sr = 48000) {
   return renderSfx(spec.preset ? sfxFromPreset(spec) : spec, sr);
 }
+
+/* ---------------- 追加の効果音：バラエティ・YouTube の定番、ゲーム、生活音、映画的な演出 ---------------- */
+
+SFX_CATEGORIES.splice(3, 0, { id: 'jp', label: 'バラエティ定番' }, { id: 'game', label: 'ゲーム' });
+SFX_CATEGORIES.push({ id: 'cine', label: '映画・予告編' });
+
+const nf = (m) => 440 * Math.pow(2, (m - 69) / 12); // MIDI 番号 → Hz
+const Lg = (o) => o.length || 1;
+/** 鐘・チャイムのような音（1 音） */
+const bellNote = (o, at, m, dur, gain = 0, pan = 0, bright = 1) => ({ at, src: 'modal', freq: nf(m) * P(o), modes: [[1, dur, 1], [2.76, dur * 0.4, 0.3 * bright * (1 + (o.tone || 0))], [5.4, dur * 0.18, 0.12 * bright], [8.93, dur * 0.08, 0.05 * bright]], amp: { a: 0.002, h: dur, d: dur * 0.3 }, gain, pan });
+/** 電子音（1 音）。src: square / saw / sine / tri */
+const beep = (o, src, at, m, dur, gain = 0, extra = {}) => ({ at, src, freq: nf(m) * P(o), amp: [[0, 0], [0.004, 1], [Math.max(0.012, dur - 0.02), 0.85], [dur, 0]], gain, lp: B(o, src === 'sine' ? 12000 : 6500), ...extra });
+/** ブラス風（のこぎり波 3 本 + フィルターが開く） */
+const brassNote = (o, at, m, dur, gain = 0) => ({ at, src: 'saw', voices: 3, detune: 12, width: 0.5, freq: nf(m) * P(o), filter: { type: 'lp', freq: [[0, 500], [0.05, B(o, 3800), 'out'], [dur, B(o, 1800)]], q: 1 }, amp: [[0, 0], [0.012, 1], [Math.max(0.02, dur - 0.04), 0.8], [dur, 0]], gain, vibrato: dur > 0.4 ? { rate: 5.5, depth: 0.12 } : undefined });
+const at = (def, t, g = 0) => def.layers.map((l) => ({ ...l, at: (l.at || 0) + t, gain: (l.gain || 0) + g }));
+
+Object.assign(SFX_PRESETS, {
+  /* ---------- バラエティ定番 ---------- */
+  pinpon: { cat: 'jp', label: 'ピンポン（正解）', make: (o) => ({
+    layers: [0, 1].flatMap((k) => [bellNote(o, k * 0.42 * Lg(o), 83, 0.5, 0, -0.1, 0.6), bellNote(o, (k * 0.42 + 0.17) * Lg(o), 79, 0.7, 0, 0.1, 0.6)]),
+    fx: verb(o.space ?? 0.2, 0.7, 0.8) }) },
+  bubu: { cat: 'jp', label: 'ブブー（不正解）', make: (o) => ({
+    layers: [0, 0.2 * Lg(o)].map((t, k) => ({ at: t, src: 'saw', voices: 3, detune: 30, freq: nf(46) * P(o), filter: { type: 'lp', freq: B(o, 1600), q: 1.4 }, drive: 8, amp: [[0, 0], [0.006, 1], [(k ? 0.42 : 0.14) * Lg(o), 0.9], [(k ? 0.46 : 0.17) * Lg(o), 0]] })).concat([0, 0.2 * Lg(o)].map((t, k) => ({ at: t, src: 'square', freq: nf(34) * P(o), lp: 900, amp: [[0, 0], [0.006, 1], [(k ? 0.42 : 0.14) * Lg(o), 0.9], [(k ? 0.46 : 0.17) * Lg(o), 0]], gain: -4 }))),
+    fx: verb(o.space ?? 0.1, 0.5, 0.5) }) },
+  shakin: { cat: 'jp', label: 'シャキーン', make: (o) => ({
+    layers: [
+      { src: 'noise', width: 0.6, filter: { type: 'hp', freq: [[0, 3000], [0.08, B(o, 7000), 'exp']] }, amp: [[0, 0], [0.05, 1, 'in'], [0.09, 0.2], [0.35, 0, 'out']], gain: -4 },
+      { at: 0.07, src: 'modal', freq: 3100 * P(o), modes: [[1, 1.1 * Lg(o), 1], [1.51, 0.8, 0.7], [2.33, 0.5, 0.5], [3.7, 0.3, 0.3]], amp: { a: 0.001, h: 1 * Lg(o), d: 0.4 }, gain: -2 },
+      { at: 0.07, src: 'metal', freq: 1900 * P(o), filter: { type: 'hp', freq: 6000 }, amp: { a: 0.001, d: 0.5 * Lg(o) }, gain: -12 },
+      { at: 0.07, src: 'sine', freq: [[0, 5200 * P(o)], [0.5, 6400 * P(o)]], amp: { a: 0.002, d: 0.7 * Lg(o) }, gain: -16 },
+    ], fx: [{ type: 'delay', time: 0.09, feedback: 0.3, mix: 0.15, pingpong: true }, ...verb(o.space ?? 0.4, 1.2, 1.6)] }) },
+  kiran: { cat: 'jp', label: 'キラーン', make: (o) => ({
+    layers: [bellNote(o, 0, 100, 0.5, -2, -0.2), bellNote(o, 0.06, 105, 1.2 * Lg(o), 0, 0.2),
+      { at: 0.06, src: 'sine', freq: [[0, nf(105) * P(o)], [0.6, nf(107) * P(o)]], amp: { a: 0.01, d: 0.9 * Lg(o) }, gain: -14, vibrato: { rate: 9, depth: 0.2 } },
+      { at: 0.05, src: 'noise', width: 1, hp: 9000, amp: [[0, 0.5], [0.5, 0, 'out']], gain: -18 }],
+    fx: [{ type: 'delay', time: 0.1, feedback: 0.4, mix: 0.2, pingpong: true }, ...verb(o.space ?? 0.5, 1.3, 2)] }) },
+  dodon: { cat: 'jp', label: 'ドドン（和太鼓）', make: (o, r) => ({
+    layers: [...at(drum('odaiko', { ...o, space: 0, length: 0.7 }, r), 0, -4), ...at(drum('odaiko', { ...o, space: 0, pitch: (o.pitch || 0) - 2 }, r), 0.17 * Lg(o), 0)],
+    fx: [{ type: 'transient', attack: 4 }, ...verb(o.space ?? 0.35, 1.4, 1.8)] }) },
+  tettere: { cat: 'jp', label: 'テッテレー（ファンファーレ）', make: (o) => {
+    const u = 0.11 * Lg(o);
+    return { layers: [[0, 67, u * 0.9], [u, 72, u * 0.9], [u * 2, 76, u * 0.9], [u * 3, 79, 0.75 * Lg(o)]].flatMap(([t, m, d], k) => [brassNote(o, t, m, d, k === 3 ? 0 : -2), brassNote(o, t, m - 12, d, -8)]).concat([brassNote(o, u * 3, 76, 0.75 * Lg(o), -5), brassNote(o, u * 3, 72, 0.75 * Lg(o), -6)]),
+      fx: verb(o.space ?? 0.3, 1.1, 1.2) };
+  } },
+  deden: { cat: 'jp', label: 'デデン（出題）', make: (o, r) => ({
+    layers: [[0, 50, 0.13, -3], [0.16 * Lg(o), 50, 0.5 * Lg(o), 0]].flatMap(([t, m, d, g]) => [brassNote(o, t, m, d, g), brassNote(o, t, m - 12, d, g - 2), brassNote(o, t, m + 7, d, g - 6), ...at(drum('tom3', { ...o, length: 0.8 }, r), t, g - 2)]),
+    fx: verb(o.space ?? 0.3, 1.2, 1.3) }) },
+  jajan: { cat: 'jp', label: 'ジャジャーン', make: (o, r) => ({
+    layers: [[0, 0.14, -3], [0.2 * Lg(o), 1.1 * Lg(o), 0]].flatMap(([t, d, g]) => [60, 64, 67, 72, 48].map((m, k) => brassNote(o, t, m, d, g - (k === 4 ? 2 : 5)))).concat(at(drum('crash', o, r), 0.2 * Lg(o), -8), at(drum('kick', o, r), 0, -4), at(drum('kick', o, r), 0.2 * Lg(o), -2)),
+    fx: verb(o.space ?? 0.35, 1.3, 1.6) }) },
+  jan: { cat: 'jp', label: 'ジャン！（決め）', make: (o, r) => ({
+    layers: [48, 60, 64, 67, 72, 76].map((m, k) => brassNote(o, 0, m, 0.5 * Lg(o), -5 + (k === 0 ? 3 : 0))).concat(at(drum('crash', { ...o, length: 0.7 }, r), 0, -8), at(drum('kick', o, r), 0, -2), [{ src: 'noise', filter: { type: 'bp', freq: 1800, q: 0.7 }, amp: { a: 0.001, d: 0.1 }, gain: -8 }]),
+    fx: verb(o.space ?? 0.35, 1.3, 1.5) }) },
+  gaan: { cat: 'jp', label: 'ガーン（ショック）', make: (o) => ({
+    layers: [36, 42, 48, 49].map((m, k) => ({ src: 'modal', freq: nf(m) * P(o), modes: Array.from({ length: 8 }, (_, i) => [(i + 1) * Math.sqrt(1 + 0.0006 * (i + 1) ** 2), 2.6 * Lg(o) / (1 + i * 0.5), 1 / (i + 1) ** (0.9 - (o.tone || 0) * 0.3)]), amp: { a: 0.001, h: 2.2 * Lg(o), d: 0.8 }, gain: -4 - k, pan: (k - 1.5) * 0.2 }))
+      .concat([{ src: 'noise', filter: { type: 'lp', freq: 2500 }, amp: { a: 0.001, d: 0.03 }, gain: -10 }]),
+    fx: verb(o.space ?? 0.5, 1.6, 2.4) }) },
+  hyuu: { cat: 'jp', label: 'ヒュー（落下）', make: (o) => {
+    const L = 1.1 * Lg(o);
+    return { layers: [{ src: 'sine', len: L, freq: [[0, 2300 * P(o)], [L, 320 * P(o), 'exp']], vibrato: { rate: 7, depth: 0.15 }, amp: [[0, 0], [0.05, 1], [L * 0.85, 0.8], [L, 0]] }, { src: 'noise', len: L, filter: { type: 'bp', freq: [[0, 4600 * P(o)], [L, 640 * P(o), 'exp']], q: 6 }, amp: [[0, 0], [0.05, 0.5], [L, 0]], gain: -10 }], fx: verb(o.space ?? 0.2, 0.8, 0.8) };
+  } },
+  dokaan: { cat: 'jp', label: 'ドカーン', make: (o, r) => { const e = SFX_PRESETS.explosion.make({ ...o, length: 0.6 * Lg(o), punch: 0.9 }, r); return { ...e, layers: [...e.layers, ...at(drum('kick', { ...o, punch: 1 }, r), 0, 2)] }; } },
+  poyon: { cat: 'jp', label: 'ポヨン', make: (o) => ({
+    layers: [{ src: 'sine', freq: [[0, 300 * P(o)], [0.06, 620 * P(o), 'exp'], [0.4 * Lg(o), 520 * P(o)]], wobble: { rate: 16, depth: 4, decay: 0.16 * Lg(o) }, amp: { a: 0.003, h: 0.03, d: 0.35 * Lg(o) } }, { src: 'tri', freq: [[0, 600 * P(o)], [0.06, 1240 * P(o), 'exp']], wobble: { rate: 16, depth: 4, decay: 0.16 }, amp: { a: 0.002, d: 0.18 }, gain: -12 }],
+    fx: verb(o.space ?? 0.15, 0.6, 0.6) }) },
+  chiin: { cat: 'jp', label: 'チーン（おりん）', make: (o) => ({
+    layers: [0, 1].map((k) => ({ src: 'modal', freq: (1480 + k * 3.5) * P(o), modes: [[1, 4.5 * Lg(o), 1], [2.71, 2, 0.35 * (1 + (o.tone || 0))], [5.18, 0.8, 0.15], [8.3, 0.3, 0.06]], amp: { a: 0.001, h: 4 * Lg(o), d: 1.5 }, gain: -3, pan: k ? 0.25 : -0.25 })).concat([{ src: 'noise', filter: { type: 'bp', freq: 5000, q: 2 }, amp: { a: 0.0003, d: 0.012 }, gain: -16 }]),
+    fx: verb(o.space ?? 0.35, 1.4, 2.4) }) },
+  kaan: { cat: 'jp', label: 'カーン（ゴング）', make: (o) => ({
+    layers: [{ src: 'modal', freq: 620 * P(o), modes: [[1, 2.4 * Lg(o), 1], [1.48, 1.8, 0.8], [2.21, 1.3, 0.6], [2.95, 0.9, 0.45], [3.9, 0.6, 0.3 * (1 + (o.tone || 0))], [5.3, 0.3, 0.2]], amp: { a: 0.001, h: 2.2 * Lg(o), d: 0.8 } }, { src: 'noise', filter: { type: 'bp', freq: 3000, q: 1 }, amp: { a: 0.0003, d: 0.02 }, gain: -8 }],
+    fx: verb(o.space ?? 0.4, 1.4, 2) }) },
+  hyoshigi: { cat: 'jp', label: '拍子木（チョンチョン）', make: (o, r) => ({ layers: [...at(drum('hyoshigi', { ...o, space: 0 }, r), 0), ...at(drum('hyoshigi', { ...o, space: 0 }, r), 0.42 * Lg(o))], fx: verb(o.space ?? 0.4, 1, 1.3) }) },
+  pafu: { cat: 'jp', label: 'パフパフ（ラッパ）', make: (o) => ({
+    layers: [0, 0.26 * Lg(o)].map((t, k) => ({ at: t, src: 'saw', voices: 2, detune: 18, freq: [[0, (k ? 370 : 392) * P(o)], [0.03, (k ? 330 : 350) * P(o)], [0.18, (k ? 300 : 330) * P(o)]], filter: { type: 'bp', freq: B(o, 1100), q: 2.2 }, drive: 6, amp: [[0, 0], [0.012, 1], [0.15 * Lg(o), 0.8], [0.2 * Lg(o), 0]] })),
+    fx: verb(o.space ?? 0.12, 0.5, 0.5) }) },
+  zuko: { cat: 'jp', label: 'ズコー（ずっこけ）', make: (o, r) => {
+    const L = 0.55 * Lg(o);
+    return { layers: [{ src: 'saw', voices: 3, detune: 14, len: L, freq: [[0, 520 * P(o)], [L, 90 * P(o), 'exp']], filter: { type: 'lp', freq: [[0, B(o, 3200)], [L, 700, 'exp']], q: 1.2 }, wobble: { rate: 11, depth: 1.2, decay: 0.6 }, amp: [[0, 0], [0.01, 1], [L * 0.9, 0.8], [L, 0]] }, ...at(drum('crash', { ...o, length: 0.5 }, r), L, -6), ...at(drum('tom3', o, r), L, 0), ...at(SFX_PRESETS.boing.make({ ...o, space: 0 }, r), L + 0.05, -6)], fx: verb(o.space ?? 0.2, 0.8, 0.8) };
+  } },
+  pirorin: { cat: 'jp', label: 'ピロリン', make: (o) => ({ layers: [[0, 88], [0.07, 91], [0.14, 96]].map(([t, m], k) => beep(o, 'sine', t * Lg(o), m, k === 2 ? 0.45 * Lg(o) : 0.08, 0, { amp: k === 2 ? { a: 0.003, h: 0.03, d: 0.45 * Lg(o) } : undefined })).concat([[0, 88], [0.07, 91], [0.14, 96]].map(([t, m]) => beep(o, 'tri', t * Lg(o), m + 12, 0.06, -14))), fx: [{ type: 'delay', time: 0.12, feedback: 0.25, mix: 0.12 }, ...verb(o.space ?? 0.25, 0.8, 0.9)] }) },
+  hirameki: { cat: 'jp', label: 'ピコーン（ひらめき）', make: (o, r) => ({ layers: [bellNote(o, 0, 91, 0.25, -3), bellNote(o, 0.09 * Lg(o), 98, 1.1 * Lg(o), 0), ...at(SFX_PRESETS.sparkle.make({ ...o, space: 0, length: 0.6 }, r), 0.1, -10)], fx: [{ type: 'delay', time: 0.1, feedback: 0.3, mix: 0.15, pingpong: true }, ...verb(o.space ?? 0.4, 1.1, 1.5)] }) },
+  doyon: { cat: 'jp', label: 'どよーん（落ち込み）', make: (o) => {
+    const L = 1.6 * Lg(o);
+    return { layers: [52, 51, 49, 46].map((m, k) => ({ at: k * L * 0.2, src: 'tri', voices: 2, detune: 25, freq: [[0, nf(m) * P(o)], [L * 0.3, nf(m - 1) * P(o)]], vibrato: { rate: 4, depth: 0.5 }, filter: { type: 'lp', freq: B(o, 900), q: 1 }, amp: { a: 0.03, h: L * 0.12, d: L * 0.35 }, gain: -k })), fx: [{ type: 'chorus', mix: 0.5 }, ...verb(o.space ?? 0.5, 1.5, 2)] };
+  } },
+  pyon: { cat: 'jp', label: 'ピョン', make: (o) => ({ layers: [{ src: 'sine', freq: [[0, 420 * P(o)], [0.09 * Lg(o), 1300 * P(o), 'exp']], amp: [[0, 0], [0.004, 1], [0.08 * Lg(o), 0.8], [0.13 * Lg(o), 0]] }, { src: 'tri', freq: [[0, 840 * P(o)], [0.09 * Lg(o), 2600 * P(o), 'exp']], amp: { a: 0.003, d: 0.09 }, gain: -14 }], fx: verb(o.space ?? 0.15, 0.5, 0.5) }) },
+  tsuzumi: { cat: 'jp', label: 'ポン（鼓）', make: (o) => ({
+    layers: [{ src: 'sine', freq: [[0, 330 * P(o)], [0.05, 300 * P(o)], [0.3 * Lg(o), 470 * P(o), 'out']], amp: { a: 0.001, h: 0.02, d: 0.4 * Lg(o) }, drive: 4 }, { src: 'tri', freq: [[0, 700 * P(o)], [0.02, 480 * P(o), 'exp']], amp: { a: 0.0005, d: 0.05 }, gain: -6 }, { src: 'noise', filter: { type: 'bp', freq: B(o, 2400), q: 1.2 }, amp: { a: 0.0003, d: 0.02 }, gain: -8 }],
+    fx: verb(o.space ?? 0.3, 0.9, 1.1) }) },
+  taikoroll: { cat: 'jp', label: '和太鼓の連打 → ドン', make: (o, r) => {
+    const layers = []; let t = 0, gap = 0.34 * Lg(o), k = 0;
+    while (gap > 0.055) { layers.push(...at(drum('odaiko', { ...o, space: 0, length: 0.5 }, r), t, -10 + Math.min(8, k * 0.7))); t += gap; gap *= 0.86; k++; }
+    layers.push(...at(drum('odaiko', { ...o, space: 0, length: 1.3, pitch: (o.pitch || 0) - 3 }, r), t + 0.12, 2), ...at(drum('kane', { ...o, length: 1.5 }, r), t + 0.12, -8));
+    return { layers, fx: [{ type: 'transient', attack: 3 }, ...verb(o.space ?? 0.35, 1.5, 2)] };
+  } },
+  furin: { cat: 'jp', label: '風鈴', make: (o, r) => ({ layers: [0, 0.35, 0.5, 1.1, 1.35].map((t, k) => ({ at: t * Lg(o) * jit(r, 0.2), src: 'modal', freq: (2650 + (k % 2) * 40) * P(o), modes: [[1, 1.4, 1], [2.3, 0.6, 0.4], [3.6, 0.3, 0.25], [5.1, 0.15, 0.1]], amp: { a: 0.001, h: 1.2, d: 0.5 }, gain: -3 - r() * 8, pan: (r() - 0.5) * 0.8 })), fx: verb(o.space ?? 0.4, 1.2, 1.8) }) },
+  shishiodoshi: { cat: 'jp', label: 'ししおどし（カコーン）', make: (o) => ({
+    layers: [{ src: 'modal', freq: 520 * P(o), modes: [[1, 0.16, 1], [2.4, 0.07, 0.6], [4.1, 0.04, 0.4], [6.3, 0.02, 0.25]], amp: { a: 0.0003, h: 0.15, d: 0.1 } }, { src: 'noise', filter: { type: 'bp', freq: B(o, 1800), q: 1.5 }, amp: { a: 0.0003, d: 0.015 }, gain: -6 }, { at: 0.25, src: 'pink', width: 0.8, filter: { type: 'bp', freq: 2500, q: 0.8 }, amp: [[0, 0], [0.1, 0.4], [0.6 * Lg(o), 0, 'out']], gain: -16 }],
+    fx: verb(o.space ?? 0.5, 1.5, 2) }) },
+  applause: { cat: 'jp', label: '拍手', make: (o, r) => {
+    const L = 2.6 * Lg(o), layers = [];
+    const n = Math.round(150 * Lg(o));
+    for (let k = 0; k < n; k++) {
+      const u = r(), t = u * L, env = Math.min(1, u * 5) * Math.min(1, (1 - u) * 2.2);
+      layers.push({ at: t, src: 'noise', filter: { type: 'bp', freq: B(o, 900 + r() * 1700), q: 0.9 + r() }, amp: { a: 0.0006, d: 0.012 + r() * 0.02 }, gain: -14 + 10 * env - r() * 6, pan: (r() - 0.5) * 1.8 });
+    }
+    layers.push({ src: 'pink', width: 1, len: L, filter: { type: 'bp', freq: 1700, q: 0.5 }, amp: [[0, 0], [L * 0.2, 1], [L * 0.6, 0.9], [L, 0, 'out']], gain: -22 });
+    return { layers, fx: verb(o.space ?? 0.35, 1.3, 1.2), loudCap: -14 };
+  } },
+  schoolchime: { cat: 'jp', label: '学校のチャイム', make: (o) => {
+    const u = 0.55 * Lg(o), seq = [69, 65, 67, 60, null, 60, 67, 69, 65];
+    return { layers: seq.map((m, k) => (m == null ? null : bellNote(o, k * u, m, k === 3 || k === 8 ? 2 : 1.1, 0, 0, 0.5))).filter(Boolean), fx: verb(o.space ?? 0.35, 1.3, 1.8) };
+  } },
+
+  /* ---------- ゲーム ---------- */
+  kettei: { cat: 'game', label: '決定音', make: (o) => ({ layers: [beep(o, 'square', 0, 81, 0.06, -6), beep(o, 'square', 0.06, 88, 0.16 * Lg(o), -6), beep(o, 'tri', 0.06, 100, 0.1, -14)], fx: verb(o.space ?? 0.12, 0.5, 0.5) }) },
+  cancel: { cat: 'game', label: 'キャンセル音', make: (o) => ({ layers: [beep(o, 'square', 0, 76, 0.06, -6), beep(o, 'square', 0.06, 69, 0.16 * Lg(o), -6)], fx: verb(o.space ?? 0.12, 0.5, 0.5) }) },
+  cursor: { cat: 'game', label: 'カーソル音', make: (o) => ({ layers: [beep(o, 'square', 0, 93, 0.035 * Lg(o), -8), beep(o, 'tri', 0, 81, 0.03, -12)], fx: verb(o.space ?? 0.05, 0.4, 0.3) }) },
+  levelup: { cat: 'game', label: 'レベルアップ', make: (o, r) => ({ layers: [60, 64, 67, 72, 76, 79, 84].map((m, k) => beep(o, 'square', k * 0.06 * Lg(o), m, k === 6 ? 0.5 * Lg(o) : 0.07, -8)).concat([72, 76, 79].map((m) => beep(o, 'saw', 0.36 * Lg(o), m, 0.5 * Lg(o), -14)), at(SFX_PRESETS.sparkle.make({ ...o, space: 0, length: 0.6 }, r), 0.36 * Lg(o), -12)), fx: [{ type: 'delay', time: 0.09, feedback: 0.3, mix: 0.15 }, ...verb(o.space ?? 0.25, 0.8, 1)] }) },
+  gameover: { cat: 'game', label: 'ゲームオーバー', make: (o) => { const u = 0.28 * Lg(o); return { layers: [[72, 1], [71, 1], [70, 1], [69, 1], [65, 1], [62, 1], [60, 3]].map(([m, d], k) => beep(o, 'square', k * u, m, d * u * 0.95, -6, { vibrato: k === 6 ? { rate: 5, depth: 0.3 } : undefined })).concat([[48, 4, 0], [43, 3, 4]].map(([m, d, s]) => beep(o, 'tri', s * u, m, d * u, -8))), fx: verb(o.space ?? 0.25, 0.9, 1.1) }; } },
+  kaifuku: { cat: 'game', label: '回復', make: (o, r) => ({ layers: [72, 76, 79, 84, 88, 91].map((m, k) => ({ at: k * 0.07 * Lg(o), src: 'sine', voices: 2, detune: 8, width: 1, freq: nf(m) * P(o), amp: { a: 0.01, h: 0.05, d: 0.5 * Lg(o) }, gain: -6 })).concat(at(SFX_PRESETS.sparkle.make({ ...o, space: 0 }, r), 0.2, -10)), fx: [{ type: 'chorus', mix: 0.5 }, { type: 'delay', time: 0.14, feedback: 0.35, mix: 0.2, pingpong: true }, ...verb(o.space ?? 0.5, 1.4, 2)] }) },
+  damage: { cat: 'game', label: 'ダメージ', make: (o) => ({ layers: [{ src: 'square', freq: [[0, 420 * P(o)], [0.14 * Lg(o), 90 * P(o), 'exp']], amp: [[0, 0], [0.002, 1], [0.12 * Lg(o), 0.7], [0.16 * Lg(o), 0]], lp: B(o, 4500), gain: -4 }, { src: 'noise', amp: [[0, 0], [0.001, 1], [0.08, 0]], hp: 1500, gain: -8 }], fx: [{ type: 'crush', bits: 6, rate: 4, mix: 0.6 }] }) },
+  onebeep: { cat: 'game', label: 'カウントダウン（3・2・1）', make: (o) => ({ layers: [0, 1, 2].map((k) => beep(o, 'sine', k * Lg(o), 81, 0.12, -3)).concat([beep(o, 'sine', 3 * Lg(o), 93, 0.6, 0), beep(o, 'tri', 3 * Lg(o), 93, 0.6, -10)]), fx: verb(o.space ?? 0.1, 0.5, 0.5) }) },
+  warp: { cat: 'game', label: 'ワープ', make: (o) => { const L = 1.1 * Lg(o); return { layers: [{ src: 'saw', voices: 5, detune: 30, width: 1, len: L, freq: [[0, 110 * P(o)], [L, 1760 * P(o), 'in']], filter: { type: 'bp', freq: [[0, 400], [L, B(o, 7000), 'in']], q: 2 }, amp: [[0, 0], [L * 0.85, 1, 'in'], [L, 0]] }, { src: 'noise', width: 1, len: L, filter: { type: 'bp', freq: [[0, 800], [L, 9000, 'exp']], q: 3 }, amp: [[0, 0], [L * 0.9, 0.7, 'in'], [L, 0]], gain: -6 }], fx: [{ type: 'phaser', rate: 3, mix: 0.6 }, ...verb(o.space ?? 0.4, 1.3, 1.6)] }; } },
+  robot: { cat: 'game', label: 'ロボット', make: (o, r) => { const layers = []; let t = 0; for (let k = 0; k < 7; k++) { const d = 0.05 + r() * 0.07; layers.push({ at: t, src: 'square', freq: (140 + Math.floor(r() * 8) * 45) * P(o), fm: { ratio: 2.5, index: 2 + r() * 4 }, filter: { type: 'bp', freq: B(o, 700 + r() * 1800), q: 3 }, amp: [[0, 0], [0.003, 1], [d, 0.9], [d + 0.004, 0]], gain: -4 }); t += d + 0.015; } return { layers, fx: [{ type: 'ringmod', freq: 60, mix: 0.35 }, ...verb(o.space ?? 0.12, 0.5, 0.5)] }; } },
+  scan: { cat: 'game', label: 'スキャン・データ処理', make: (o, r) => { const L = 1.2 * Lg(o), layers = [{ src: 'sine', len: L, freq: [[0, 600 * P(o)], [L, 2400 * P(o)]], amp: [[0, 0], [0.05, 0.4], [L - 0.05, 0.4], [L, 0]], gain: -10 }]; for (let t = 0; t < L; t += 0.045) layers.push({ at: t, src: 'square', freq: (900 + Math.floor(r() * 12) * 180) * P(o), amp: [[0, 0], [0.002, 1], [0.022, 1], [0.026, 0]], lp: B(o, 7000), gain: -12, pan: (r() - 0.5) * 1.2 }); return { layers, fx: verb(o.space ?? 0.15, 0.6, 0.6) }; } },
+
+  /* ---------- 生活音（追加） ---------- */
+  alarm: { cat: 'real', label: 'アラーム', make: (o) => ({ layers: Array.from({ length: 8 }, (_, k) => beep(o, 'square', k * 0.13 * Lg(o), k % 2 ? 84 : 88, 0.11 * Lg(o), -8, { lp: B(o, 5000) })), fx: verb(o.space ?? 0.1, 0.5, 0.4) }) },
+  phone: { cat: 'real', label: '電話の着信', make: (o) => ({ layers: [0, 1.6 * Lg(o)].map((t) => ({ at: t, src: 'sine', freq: 420 * P(o), fm: { ratio: 0.04, index: 1.6 }, len: Lg(o), amp: [[0, 0], [0.01, 1], [Lg(o) - 0.02, 1], [Lg(o), 0]], tremolo: undefined })).concat([0, 1.6 * Lg(o)].map((t) => ({ at: t, src: 'sine', freq: 840 * P(o), len: Lg(o), amp: Array.from({ length: Math.round(16 * Lg(o)) * 2 + 1 }, (_, i) => [i / 32, i % 2 ? 0.5 : 0]), gain: -8 }))), fx: verb(o.space ?? 0.1, 0.5, 0.4) }) },
+  ecg: { cat: 'real', label: '心電図', make: (o) => ({ layers: [0, 1, 2].map((k) => beep(o, 'sine', k * 0.9 * Lg(o), 84, 0.11, -4)), fx: verb(o.space ?? 0.15, 0.6, 0.5) }) },
+  knock: { cat: 'real', label: 'ドアノック', make: (o, r) => ({ layers: [0, 0.19, 0.38].flatMap((t, k) => [{ at: t * Lg(o), src: 'sine', freq: [[0, 210 * P(o) * jit(r, 0.05)], [0.03, 120 * P(o), 'exp']], amp: { a: 0.0006, d: 0.07 }, drive: 6, gain: -k }, { at: t * Lg(o), src: 'noise', filter: { type: 'bp', freq: B(o, 1100), q: 1.5 }, amp: { a: 0.0004, d: 0.02 }, gain: -6 - k }, { at: t * Lg(o), src: 'modal', freq: 420 * P(o), modes: [[1, 0.05, 1], [2.3, 0.03, 0.5]], amp: { a: 0.0005, h: 0.05, d: 0.04 }, gain: -8 }]), fx: verb(o.space ?? 0.25, 0.8, 0.7) }) },
+  tick: { cat: 'real', label: '時計の秒針', make: (o) => ({ layers: [0, 1, 2, 3].flatMap((k) => [{ at: k * 0.5 * Lg(o), src: 'noise', filter: { type: 'bp', freq: B(o, k % 2 ? 2600 : 3400), q: 5 }, amp: { a: 0.0002, d: 0.012 }, gain: 0 }, { at: k * 0.5 * Lg(o), src: 'sine', freq: (k % 2 ? 1500 : 1900) * P(o), amp: { a: 0.0002, d: 0.008 }, gain: -8 }]), fx: verb(o.space ?? 0.12, 0.5, 0.4) }) },
+  katana: { cat: 'real', label: '刀（シャキン）', make: (o) => ({
+    layers: [{ src: 'noise', width: 0.5, filter: { type: 'bp', freq: [[0, 2500], [0.07, B(o, 9000), 'exp']], q: 2 }, amp: [[0, 0], [0.05, 1, 'in'], [0.1, 0]], pan: [[0, -0.5], [0.1, 0.5]] }, { at: 0.06, src: 'modal', freq: 4300 * P(o), modes: [[1, 0.6 * Lg(o), 1], [1.37, 0.4, 0.7], [1.93, 0.3, 0.5], [2.6, 0.2, 0.3]], amp: { a: 0.0005, h: 0.5 * Lg(o), d: 0.2 }, gain: -6 }, { at: 0.06, src: 'noise', hp: 7000, amp: { a: 0.0005, d: 0.05 }, gain: -10 }],
+    fx: verb(o.space ?? 0.25, 0.9, 1) }) },
+  swish: { cat: 'real', label: '風切り（ビュッ）', make: (o) => { const L = 0.16 * Lg(o); return { layers: [{ src: 'noise', width: 0.7, len: L, filter: { type: 'bp', freq: [[0, 1800 * P(o)], [L * 0.5, B(o, 5200) * P(o)], [L, 2200 * P(o)]], q: 2.2 }, amp: [[0, 0], [L * 0.45, 1, 'in'], [L, 0, 'out']], pan: [[0, 0.6], [L, -0.6]] }], fx: verb(o.space ?? 0.1, 0.5, 0.4) }; } },
+  glass: { cat: 'real', label: 'ガラスが割れる', make: (o, r) => { const layers = [{ src: 'noise', hp: 3000, amp: { a: 0.0003, d: 0.06 }, drive: 6 }]; for (let k = 0; k < 16; k++) layers.push({ at: 0.01 + Math.pow(r(), 1.6) * 0.7 * Lg(o), src: 'modal', freq: (2200 + r() * 5000) * P(o), modes: [[1, 0.12 + r() * 0.2, 1], [1.6 + r(), 0.08, 0.5]], amp: { a: 0.0005, h: 0.15, d: 0.15 }, gain: -8 - r() * 10, pan: (r() - 0.5) * 1.6 }); return { layers, fx: verb(o.space ?? 0.25, 0.9, 0.9) }; } },
+
+  /* ---------- 映画・予告編 ---------- */
+  subdrop: { cat: 'cine', label: 'サブドロップ', make: (o) => { const L = 2.2 * Lg(o); return { layers: [{ src: 'sine', len: L, freq: [[0, 160 * P(o)], [L, 28 * P(o), 'exp']], amp: [[0, 0], [0.01, 1], [L * 0.6, 0.8], [L, 0, 'out']], drive: 9 }, { src: 'tri', len: L, freq: [[0, 480 * P(o)], [L, 84 * P(o), 'exp']], amp: [[0, 0], [0.01, 0.6], [L * 0.5, 0.3], [L, 0]], drive: 12, gain: -10, lp: 2000 }, { src: 'noise', filter: { type: 'lp', freq: [[0, 5000], [0.2, 500, 'exp']] }, amp: { a: 0.001, d: 0.2 }, gain: -8 }], fx: verb(o.space ?? 0.25, 1.6, 2) }; } },
+  risehit: { cat: 'cine', label: 'ライザー → ヒット', make: (o, r) => { const L = 1.6 * Lg(o); const ri = SFX_PRESETS.riser.make({ ...o, length: L / 2.5, space: 0 }, r), im = SFX_PRESETS.impact.make({ ...o, length: 0.8, space: 0 }, r); return { layers: [...ri.layers.map((l) => ({ ...l, gain: (l.gain || 0) - 3 })), ...at(im, L, 0)], fx: verb(o.space ?? 0.4, 1.7, 2.6) }; } },
+  taperewind: { cat: 'cine', label: 'テープ巻き戻し', make: (o, r) => { const L = 0.9 * Lg(o); return { layers: [{ src: 'saw', voices: 3, detune: 40, len: L, freq: Array.from({ length: 13 }, (_, k) => [(k / 12) * L, (300 + k * 160 + (k % 2) * 260) * P(o)]), filter: { type: 'bp', freq: [[0, 900], [L, B(o, 5000), 'exp']], q: 1.5 }, amp: [[0, 0], [0.02, 0.8], [L - 0.03, 1], [L, 0]], gain: -6 }, { src: 'noise', len: L, filter: { type: 'bp', freq: [[0, 1500], [L, 8000, 'exp']], q: 2 }, amp: Array.from({ length: 25 }, (_, k) => [(k / 24) * L, k % 2 ? 0.9 : 0.25]), gain: -6 }], fx: verb(o.space ?? 0.1, 0.5, 0.5) }; } },
+  revswell: { cat: 'cine', label: '逆再生の盛り上がり', make: (o) => { const L = 1.8 * Lg(o); return { layers: [57, 64, 69, 76].map((m, k) => ({ src: 'supersaw', voices: 5, detune: 20, width: 1, len: L, freq: nf(m) * P(o), filter: { type: 'lp', freq: [[0, 300], [L, B(o, 7000), 'in']], q: 0.8 }, amp: [[0, 0], [L, 1, 'in']], gain: -8 - k })).concat([{ src: 'noise', width: 1, len: L, hp: 4000, amp: [[0, 0], [L, 1, 'in']], gain: -10 }]), fx: verb(o.space ?? 0.3, 1.5, 1.6), fadeOut: 0.004, length: L + 0.01 }; } },
+  tensionpulse: { cat: 'cine', label: '緊張の鼓動（低音の刻み）', make: (o) => ({ layers: Array.from({ length: 8 }, (_, k) => ({ at: k * 0.25 * Lg(o), src: 'saw', voices: 2, detune: 10, freq: nf(38) * P(o), filter: { type: 'lp', freq: [[0, B(o, 1400)], [0.15, 250, 'exp']], q: 1.6 }, drive: 6, amp: { a: 0.003, h: 0.02, d: 0.2 }, gain: k % 4 === 0 ? 0 : -4 })).concat(Array.from({ length: 8 }, (_, k) => ({ at: k * 0.25 * Lg(o), src: 'sine', freq: nf(26) * P(o), amp: { a: 0.003, d: 0.2 }, gain: -4 }))), fx: verb(o.space ?? 0.3, 1.4, 1.5) }) },
+  stingdim: { cat: 'cine', label: 'サスペンス（不協和音）', make: (o) => { const L = 2.4 * Lg(o); return { layers: [60, 63, 66, 69, 72].map((m, k) => ({ src: 'saw', voices: 4, detune: 18, width: 1, len: L, freq: nf(m) * P(o), filter: { type: 'lp', freq: [[0, B(o, 4500)], [L, 900, 'exp']], q: 0.7 }, amp: Array.from({ length: Math.round(L * 22) }, (_, i) => [i / 22, (i % 2 ? 0.55 : 1) * Math.max(0, 1 - i / (L * 22))]), gain: -8 })).concat([{ src: 'sine', freq: nf(36) * P(o), amp: { a: 0.005, h: 0.2, d: L }, drive: 5, gain: -4 }]), fx: verb(o.space ?? 0.5, 1.7, 2.6) }; } },
+  charge: { cat: 'cine', label: 'チャージ（溜め）→ 発射', make: (o, r) => { const L = 1.2 * Lg(o); return { layers: [{ src: 'sine', voices: 3, detune: 14, width: 1, len: L, freq: [[0, 200 * P(o)], [L, 3200 * P(o), 'in']], amp: [[0, 0], [L * 0.95, 1, 'in'], [L, 0]], tremolo: undefined, vibrato: { rate: 18, depth: 0.3 }, gain: -6 }, { src: 'noise', width: 1, len: L, filter: { type: 'bp', freq: [[0, 600], [L, 9000, 'exp']], q: 4 }, amp: [[0, 0], [L * 0.95, 0.8, 'in'], [L, 0]], gain: -8 }, ...at(SFX_PRESETS.laser.make({ ...o, space: 0 }, r), L, 0), ...at(drum('kick', { ...o, punch: 1 }, r), L, -2)], fx: verb(o.space ?? 0.3, 1.1, 1.3) }; } },
+  whooshheavy: { cat: 'cine', label: '重いウーシュ', make: (o, r) => { const w = SFX_PRESETS.whoosh.make({ ...o, length: 1.5 * Lg(o), punch: 1, tone: (o.tone || 0) - 0.5, space: 0 }, r); return { layers: [...w.layers, { src: 'sine', len: 0.9 * Lg(o), freq: [[0, 50 * P(o)], [0.5 * Lg(o), 90 * P(o)], [0.9 * Lg(o), 40 * P(o)]], amp: [[0, 0], [0.5 * Lg(o), 1, 'in'], [0.9 * Lg(o), 0, 'out']], drive: 8, gain: -4 }], fx: verb(o.space ?? 0.4, 1.6, 2) }; } },
+});
